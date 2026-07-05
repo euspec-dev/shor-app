@@ -1,0 +1,1047 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#34363b">
+<title>SHOR. — 感性を、波間に浮かべる。</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@200;300;400;500&family=Noto+Sans+JP:wght@200;300;400&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<style>
+/* ============================================================
+   うみのは — MVP
+   美学: 引き算 / 静寂 / 余白。原色・ドロップシャドウ・過剰動作の排除。
+   ============================================================ */
+:root{
+  /* 砂浜の背景写真（Unsplash License / Sean Oulashin "seashore during golden hour"）
+     差し替える場合はこのURLを変更するだけでよい */
+  --shore-img:url("https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=70&w=1800&auto=format&fit=crop");
+  --ink-mist:#ece7dc;            /* 砂浜を思わせる温かいシェルホワイト */
+  --ink-faint:rgba(196,206,216,.72); /* 半透明の淡いブルーグレー（補足用） */
+  --ink-charcoal:#3d3a35;      /* ポラロイド紙上の深いチャコール */
+  --ink-charcoal-soft:#6b675f;
+  --paper:#f5f1e8;             /* 古い印画紙の白 */
+  --rust:#9a5b4f;              /* 落ち着いた錆色（超過警告） */
+  --warmth:226,164,118;        /* 体温の色（夕暮れの残光のような、落ち着いた温かい琥珀）RGB */
+  --line:rgba(245,241,232,.28);
+  --dur-fade:1100ms;
+}
+
+*{margin:0;padding:0;box-sizing:border-box}
+
+/* --- タッチ制御: 長押しメニュー・選択・保存挙動の徹底無効化 --- */
+html,body{
+  -webkit-touch-callout:none;
+  -webkit-user-select:none;
+  -moz-user-select:none;
+  user-select:none;
+  -webkit-tap-highlight-color:transparent;
+  touch-action:manipulation;
+  overscroll-behavior:none;
+}
+img{-webkit-user-drag:none;user-drag:none;pointer-events:none}
+
+html,body{height:100%;overflow:hidden}
+body{
+  /* 英数字にMontserrat、日本語にNoto Sans JPが自動適用されるペアリング */
+  font-family:'Montserrat','Noto Sans JP',sans-serif;
+  font-weight:300;
+  color:var(--ink-mist);
+  letter-spacing:.18em;
+  line-height:2.3;
+  background:#34363b;
+}
+
+/* ============ 固定背景: 朝とも夕方ともとれる薄暗い砂浜 ============ */
+#shore{position:fixed;inset:0;z-index:-2;pointer-events:none;
+  /* 写真を最前面に、読み込み失敗時のフォールバックとして砂浜色グラデーションを下層に敷く */
+  background:
+    var(--shore-img) center / cover no-repeat,
+    linear-gradient(to bottom,
+      #9aa0ac 0%, #aaa49a 34%,        /* 鈍い空 */
+      #7d878c 40%, #6f7b80 52%,       /* 静かな海 */
+      #9c8f7e 58%, #b3a48f 76%, #bfb09a 100% /* 砂浜 */
+    );
+  filter:saturate(.78); /* 彩度だけ抑え、朝とも夕方ともつかぬ曖昧さへ寄せる（明るさは保つ） */
+}
+#shore::after{ /* 粒子（実写に馴染む程度に弱く） */
+  content:"";position:absolute;inset:0;opacity:.035;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+#veil{position:fixed;inset:0;z-index:-1;pointer-events:none;
+  /* 絶妙な透明度のダークグレー: 砂浜が透けて見える濃さに留め、
+     文字が載る中央だけ柔らかく翳らせて可読性を保つ */
+  background:
+    radial-gradient(85% 70% at 50% 46%, rgba(26,28,32,.30) 0%, rgba(26,28,32,0) 100%),
+    rgba(30,32,36,.30);
+}
+
+/* ============ レイアウト ============ */
+#app{position:fixed;inset:0;display:grid;place-items:center;
+  padding:calc(58px + env(safe-area-inset-top)) 22px calc(60px + env(safe-area-inset-bottom));
+}
+.screen{
+  grid-area:1/1;width:100%;max-width:420px;
+  display:flex;flex-direction:column;align-items:center;text-align:center;
+  opacity:0;visibility:hidden;pointer-events:none;
+  transition:opacity var(--dur-fade) ease, visibility 0s linear var(--dur-fade);
+  max-height:100%;
+}
+.screen.active{opacity:1;visibility:visible;pointer-events:auto;
+  transition:opacity var(--dur-fade) ease;}
+/* 完了画面は縦の高さをいっぱいに使い、主部中央・副部下部の配置を可能にする */
+#scr-done{max-height:100%;height:100%}
+
+/* 指示テキスト（案内文）: 11px / 400 — 読みやすさと繊細さの均衡 */
+p.passage{font-size:11px;font-weight:400;letter-spacing:.22em;color:var(--ink-mist)}
+p.passage + p.passage{margin-top:2.4em}
+.small{font-size:10px;font-weight:300;color:var(--ink-faint);letter-spacing:.2em}
+.em{color:#f4f0e7}
+
+h2.quiet{font-size:10px;letter-spacing:.55em;color:var(--ink-faint);
+  font-weight:400;margin-bottom:1.6em;text-indent:.55em}
+
+/* 主ボタン: 線一本の静かな佇まい */
+.btn{
+  appearance:none;background:transparent;border:1px solid var(--line);
+  color:var(--ink-mist);font:inherit;font-weight:400;letter-spacing:.35em;text-indent:.35em;
+  font-size:11px;padding:13px 36px;margin-top:3.2em;cursor:pointer;
+  border-radius:2px;transition:background-color .6s ease,color .6s ease,border-color .6s ease,opacity .6s ease;
+}
+.btn:hover{background:rgba(245,241,232,.07)}
+.btn:focus-visible{outline:1px solid var(--ink-mist);outline-offset:3px}
+.btn:disabled{opacity:.3;cursor:default;background:transparent}
+.btn.ghost{border-color:transparent;color:var(--ink-faint);font-size:10px;font-weight:300;padding:10px 24px}
+.btn.ghost:hover{color:var(--ink-mist)}
+
+/* 完了画面: 2ボタンを横並びに。狭い画面では字間とpaddingを詰めて収める */
+.done-actions{display:flex;gap:12px;justify-content:center;margin-top:3.2em}
+.done-actions .btn{margin-top:0;flex:1 1 0;min-width:0;
+  padding:13px 10px;letter-spacing:.16em;text-indent:.16em;white-space:nowrap}
+
+/* 完了画面レイアウト: 本文＋2ボタンを画面中央、案内＋追加ボタンを下部に離す */
+#done-body{flex:1;width:100%;display:flex;flex-direction:column}
+.done-main{margin:auto 0;display:flex;flex-direction:column;align-items:center}
+.done-foot{padding-top:3.4em;display:flex;flex-direction:column;align-items:center}
+.done-foot .small{margin-top:0}
+.btn.done-pwa{font-size:9.5px;padding:9px 22px;letter-spacing:.28em;text-indent:.28em;margin-top:1.6em}
+
+/* ============ フッター ============ */
+footer{position:fixed;left:0;right:0;bottom:calc(10px + env(safe-area-inset-bottom));
+  text-align:center;font-size:9px;font-weight:300;letter-spacing:.28em;color:var(--ink-faint)}
+footer a{color:inherit;text-decoration:none;border-bottom:1px solid rgba(207,201,191,.25);padding-bottom:1px}
+
+/* ============ ポラロイド ============ */
+.polaroid{
+  width:min(86vw,350px);background:var(--paper);
+  border:1px solid rgba(0,0,0,.06);border-radius:2px;
+  padding:18px 18px 0;
+  color:var(--ink-charcoal);
+  transition:opacity 1400ms ease, transform 1400ms ease;
+}
+.polaroid.washed{opacity:0;transform:translateY(26px) rotate(.6deg)} /* 波にさらわれる */
+/* 投稿側のポラロイドは少し速く消し、完了画面を早めに見せる */
+#post-polaroid{transition:opacity 800ms ease, transform 800ms ease}
+
+/* 他人から届いた写真は、偶然流れ着いたように少し右へ傾ける */
+#view-polaroid{transform:rotate(1.5deg)}
+#view-polaroid.washed{opacity:0;transform:translateY(28px) rotate(2.4deg)} /* 傾いたまま波へ */
+
+/* 閲覧前の前置き演出: メッセージを見せてからポラロイドへ */
+.view-intro{position:absolute;top:50%;left:0;right:0;transform:translateY(-50%);
+  opacity:0;transition:opacity 1100ms ease;pointer-events:none}
+.view-intro.show{opacity:1}
+.view-stage{transition:opacity 1100ms ease, transform 1400ms ease, visibility 0s}
+.view-stage.pending{opacity:0;pointer-events:none;visibility:hidden;
+  transition:opacity 1100ms ease, transform 1400ms ease, visibility 0s linear 1100ms}  /* 前置き中は完全に伏せる */
+#view-screen-note{transition:opacity 1100ms ease, visibility 0s}
+#view-screen-note.pending{opacity:0;visibility:hidden;
+  transition:opacity 1100ms ease, visibility 0s linear 1100ms}
+#view-screen-note.fading{opacity:0;transition:opacity 1400ms ease}  /* 離脱時、写真と同じ間合いでフェードアウト */
+
+/* 投稿完了画面: 遷移が落ち着いてから本文をフェードイン */
+.post-lead{transition:opacity 900ms ease}
+.post-lead.gone{opacity:0}
+.done-body{transition:opacity 1100ms ease}
+.done-body.pending{opacity:0;pointer-events:none}
+.polaroid .caption{
+  min-height:2.6em;display:flex;align-items:center;justify-content:center;
+  font-size:11.5px;font-weight:300;letter-spacing:.2em;line-height:1.9;color:var(--ink-charcoal);
+  padding-bottom:12px;
+}
+.polaroid .photo{
+  position:relative;width:100%;aspect-ratio:1/1;overflow:hidden;
+  background:#23241f;border-radius:1px;
+}
+.polaroid .photo .pic{
+  position:absolute;inset:0;background-size:cover;background-position:center;
+  filter:blur(26px) saturate(.92);transform:scale(1.12); /* ぼかしの縁漏れ防止 */
+  will-change:filter;
+}
+.polaroid .photo .frost{ /* 磨りガラスの層 */
+  position:absolute;inset:0;background:rgba(225,220,210,.08);
+  -webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);
+}
+.polaroid .skirt{padding:18px 6px 20px}
+
+/* 現像ゾーン（細い破線の枠） */
+.dev-zone{
+  position:relative;border:1px dashed rgba(61,58,53,.45);border-radius:2px;
+  padding:13px 10px;overflow:hidden;cursor:pointer;
+  font-size:11px;font-weight:400;letter-spacing:.3em;text-indent:.3em;color:var(--ink-charcoal-soft);
+  touch-action:none;
+}
+.dev-zone .heat{ /* 押している間だけ、ボタン全体が夕焼けの色にほんのり色づく */
+  position:absolute;inset:0;opacity:0;
+  background:rgba(var(--warmth),.14);
+  transition:opacity 600ms ease;
+}
+.dev-zone.pressing .heat{opacity:1}
+.dev-zone span{position:relative}
+
+.under-note{min-height:3.4em;margin-top:14px;font-size:10px;font-weight:300;letter-spacing:.16em;
+  line-height:1.9;color:var(--ink-charcoal-soft);opacity:0;transition:opacity 900ms ease}
+.under-note.show{opacity:1}
+
+.screen-note{margin-top:auto;padding-top:26px;font-size:9px;font-weight:300;letter-spacing:.22em;
+  color:var(--ink-faint)}
+
+/* 控えめな「TOPへ戻る」リンク（中断用）。フッターと干渉しないよう下端から少し上に置く */
+.to-top{margin-top:auto;padding-top:30px;margin-bottom:6px;
+  appearance:none;background:transparent;border:none;cursor:pointer;
+  font:inherit;font-size:9.5px;font-weight:300;letter-spacing:.24em;color:var(--ink-faint);
+  transition:color .5s ease}
+.to-top:hover{color:var(--ink-mist)}
+
+/* ============ 投稿画面 ============ */
+.polaroid .caption-input{
+  width:100%;border:none;background:transparent;font:inherit;text-align:center;
+  font-size:11.5px;font-weight:300;letter-spacing:.2em;color:var(--ink-charcoal);
+  -webkit-user-select:text;user-select:text;outline:none;
+}
+.polaroid .caption-input::placeholder{color:rgba(61,58,53,.38);letter-spacing:.16em}
+.cap-row{position:relative;padding-bottom:12px}
+.counter{position:absolute;right:0;bottom:14px;font-size:9px;font-weight:400;letter-spacing:.12em;
+  color:rgba(61,58,53,.45);transition:color .4s ease}
+.counter.over{color:var(--rust)}
+.caption-input.over{color:var(--rust)}
+
+.polaroid .photo .post-img{
+  position:absolute;inset:0;background-size:cover;background-position:center;
+  opacity:0;transition:opacity 700ms ease;pointer-events:none;
+}
+.polaroid .photo .post-img.loaded{opacity:1}
+.pick{position:absolute;inset:0;display:grid;place-items:center;cursor:pointer;
+  color:rgba(245,241,232,.6);font-size:11px;font-weight:400;letter-spacing:.32em;text-indent:.32em;
+  transition:opacity 500ms ease;background:transparent;border:none;
+}
+.pick.hidden{opacity:0;pointer-events:none}
+.pick:focus-visible{outline:1px dashed rgba(245,241,232,.5);outline-offset:-8px}
+.send-btn{
+  appearance:none;width:100%;background:transparent;font:inherit;cursor:pointer;
+  border:1px solid rgba(61,58,53,.4);border-radius:2px;color:var(--ink-charcoal);
+  font-size:11px;font-weight:400;letter-spacing:.32em;text-indent:.32em;padding:12px 10px;
+  transition:opacity .6s ease,background-color .6s ease;
+}
+.send-btn:hover:enabled{background:rgba(var(--warmth),.18)}
+.send-btn:disabled{opacity:.3;cursor:default}
+
+/* ============ 通知（システム的ポップアップではなく、声のように） ============ */
+/* メインタイトル: 24px / 200 — 極限まで細く、上品な余白の佇まい */
+#brand{position:fixed;top:calc(22px + env(safe-area-inset-top));left:0;right:0;
+  text-align:center;font-size:24px;font-weight:200;letter-spacing:.7em;text-indent:.7em;
+  color:var(--ink-mist);pointer-events:none;z-index:2}
+
+/* ===== 開発テスト用バー（リリース時はHTMLごと削除） ===== */
+#devbar{position:fixed;top:calc(8px + env(safe-area-inset-top));right:10px;z-index:9;
+  display:flex;gap:14px}
+#devbar button{appearance:none;background:transparent;border:none;cursor:pointer;
+  font:inherit;font-size:9px;font-weight:300;letter-spacing:.18em;
+  color:var(--ink-faint);opacity:.65;padding:6px 2px;
+  border-bottom:1px dotted rgba(196,206,216,.4)}
+#devbar button:hover{opacity:1}
+
+#whisper{position:fixed;left:50%;bottom:calc(38px + env(safe-area-inset-bottom));transform:translateX(-50%);
+  width:min(86vw,360px);text-align:center;font-size:10.5px;font-weight:300;letter-spacing:.18em;
+  line-height:2.1;color:var(--ink-mist);opacity:0;pointer-events:none;
+  transition:opacity 900ms ease;z-index:8;
+  text-shadow:0 1px 12px rgba(20,22,26,.6)} /* 背景に埋もれず読めるよう、ごく淡い陰 */
+#whisper.show{opacity:1}
+
+/* 前日投稿の結果ポップアップ */
+.modal[hidden]{display:none}   /* hidden時は確実に非表示（display:flexの上書き防止） */
+.modal{position:fixed;inset:0;z-index:10;display:flex;align-items:center;justify-content:center;
+  padding:28px;background:rgba(20,22,26,.5);
+  opacity:0;transition:opacity 700ms ease}
+.modal.show{opacity:1}
+.modal-card{position:relative;width:min(86vw,340px);
+  background:var(--paper);color:var(--ink-charcoal);
+  border-radius:3px;padding:38px 26px 32px;text-align:center;
+  transform:translateY(8px);transition:transform 700ms ease}
+.modal.show .modal-card{transform:translateY(0)}
+.modal-card .quiet{color:var(--ink-charcoal-soft);margin-bottom:1.6em}
+.modal-card .passage{color:var(--ink-charcoal)}
+.modal-card .passage.em{color:var(--ink-charcoal);margin-top:1.4em}
+.modal-close{position:absolute;top:8px;right:10px;appearance:none;background:transparent;
+  border:none;cursor:pointer;font-size:18px;font-weight:300;line-height:1;
+  color:var(--ink-charcoal-soft);padding:6px 8px}
+.modal-close:hover{color:var(--ink-charcoal)}
+
+@media (prefers-reduced-motion:reduce){
+  *{transition-duration:1ms !important;animation:none !important}
+}
+</style>
+</head>
+<body>
+
+<div id="shore" aria-hidden="true"></div>
+<div id="veil" aria-hidden="true"></div>
+
+<h1 id="brand">SHOR.</h1>
+
+<!-- ===== 開発テスト用（リリース時はこのブロックを削除） ===== -->
+<div id="devbar" aria-label="開発用">
+  <button type="button" id="dev-yesterday">前日投稿</button>
+  <button type="button" id="dev-skip">一日進める</button>
+  <button type="button" id="dev-reset">リセット</button>
+</div>
+
+<main id="app">
+
+  <!-- ============ 画面1: ダッシュボード ============ -->
+  <section class="screen" id="scr-home" aria-label="ホーム">
+    <div id="home-a" hidden>
+      <p class="passage">ここは、フォロワーや評価のない<br>静かな海。</p>
+      <p class="passage">誰かに見せるための写真ではなく、<br>あなただけの <span class="em">感性</span> を<br>ボトルメールのように<br>海に浮かべてみる。</p>
+      <p class="passage">あなたの感性は<br>受け取った誰かの温もりで、<br>ゆっくりと現像されます。<br>あなたと誰かとの間でだけ、<br>あなたの感性が共有されます。</p>
+      <p class="passage">まずは、あなたのもとに流れ着いた<br>誰かの『感性』に触れてみてください。</p>
+    </div>
+    <button class="btn" id="btn-see">誰かの感性に触れる</button>
+    <button class="to-top" id="home-to-post" type="button" style="margin-top:1.8em;padding-top:0">写真を海に流す</button>
+  </section>
+
+  <!-- ============ 画面2: 閲覧（現像） ============ -->
+  <section class="screen" id="scr-view" aria-label="現像">
+    <p class="passage view-intro" id="view-intro">あなたのもとへ<br>誰かのボトルメールが<br>流れ着いたようです。</p>
+    <div class="polaroid view-stage pending" id="view-polaroid">
+      <div class="caption" id="view-caption"></div>
+      <div class="photo">
+        <div class="pic" id="view-pic"></div>
+        <div class="frost" id="view-frost"></div>
+      </div>
+      <div class="skirt">
+        <div class="dev-zone" id="dev-zone" role="button" aria-label="長押しで現像する">
+          <div class="heat" id="heat"></div>
+          <span id="dev-label">現像する（長押し）</span>
+        </div>
+        <div class="under-note" id="under-note"></div>
+      </div>
+    </div>
+    <div class="screen-note pending" id="view-screen-note">※スクリーンショット等での写真の保存はご遠慮ください。</div>
+  </section>
+
+  <!-- ============ 画面3: 投稿（海に流す） ============ -->
+  <section class="screen" id="scr-post" aria-label="海に流す">
+    <p class="passage post-lead" id="post-lead" style="margin-bottom:3em">今度はこっそりと、<br>あなたの感性を誰かに届けてみませんか？</p>
+    <div class="polaroid" id="post-polaroid">
+      <div class="cap-row">
+        <input class="caption-input" id="cap-input" type="text" inputmode="text"
+               enterkeyhint="done" maxlength="40"
+               placeholder="説明を入力（任意）" autocomplete="off">
+        <div class="counter" id="cap-counter">0/15</div>
+      </div>
+      <div class="photo">
+        <div class="post-img" id="post-pic"></div>
+        <button class="pick" id="btn-pick" type="button">＋ 写真を選ぶ</button>
+        <input type="file" id="file-input" accept="image/*" hidden>
+      </div>
+      <div class="skirt">
+        <button class="send-btn" id="btn-send" type="button" disabled>海に流す</button>
+      </div>
+    </div>
+    <button class="to-top" id="post-to-top" type="button">TOPへ戻る</button>
+  </section>
+
+  <!-- ============ 画面4: 投稿完了 ============ -->
+  <section class="screen" id="scr-done" aria-label="投稿完了">
+    <div class="done-body pending" id="done-body">
+      <div class="done-main">
+        <p class="passage">あなたの写真は海を漂い、<br>誰かのもとへ流れ着きます。</p>
+        <p class="passage">あなたの感性がどんな旅をしたかをお伝えします。<br>明日の今頃、こちらにのぞきに来てください。</p>
+        <div class="done-actions">
+          <button class="btn" id="btn-give2see">誰かの感性に触れる</button>
+          <button class="btn" id="btn-post-again">もう一通海に流す</button>
+        </div>
+        <button class="to-top" id="done-to-top" type="button" style="margin-top:1.8em;padding-top:0">TOPへ戻る</button>
+      </div>
+      <div class="done-foot">
+        <p class="small">現在はプロトタイプとしてひっそりと開かれています。<br>もし気に入っていただけたなら、<br>ホーム画面に追加して応援してください。</p>
+        <button class="btn done-pwa" id="btn-pwa">ホーム画面に追加する</button>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- 前日投稿の結果ポップアップ（コンセプト画面に重ねて表示） -->
+<div id="result-modal" class="modal" hidden>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-label="あなたの感性のゆくえ">
+    <button class="modal-close" id="result-close" type="button" aria-label="閉じる">×</button>
+    <h2 class="quiet">あなたの感性のゆくえ</h2>
+    <p class="passage">昨日のあなたの感性は、<br>見知らぬ誰かのもとへ<br>流れ着きました。</p>
+    <p class="passage em"><span id="result-sec" style="font-size:1.35em">--</span> 秒間、<br>誰かの感性と深く響き合いました。</p>
+  </div>
+</div>
+
+<!-- 閲覧不可のお知らせポップアップ -->
+<div id="notice-modal" class="modal" hidden>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-label="お知らせ">
+    <button class="modal-close" id="notice-close" type="button" aria-label="閉じる">×</button>
+    <p class="passage" id="notice-text"></p>
+  </div>
+</div>
+
+<div id="whisper" role="status" aria-live="polite"></div>
+
+<footer>
+  <a href="#" id="link-privacy">プライバシーポリシー</a>　｜　<a href="#" id="link-contact">お問い合わせ</a>
+</footer>
+
+<script>
+/* ============================================================
+   SHOR. — Supabase 統合版
+   バックエンド: Supabase (PostgreSQL + Storage)
+   ============================================================ */
+(() => {
+"use strict";
+
+/* ---------- Supabase 初期化 ----------
+   接続情報は config.js（環境ごとに用意する、gitignore対象）から読む。
+   ローカル開発時は config.example.js を config.js としてコピーし、値を埋めること。 */
+const { createClient } = supabase;
+if (!window.SHOR_CONFIG){
+  throw new Error("config.js が見つかりません。config.example.js をコピーして config.js を作成してください。");
+}
+const { SUPABASE_URL, SUPABASE_ANON_KEY } = window.SHOR_CONFIG;
+const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+/* 開発用機能（開発バー・EXIF検証スキップ）の唯一のスイッチ。
+   config.js の IS_DEV でのみ切り替える。本番用 config.js は必ず false にすること。 */
+const IS_DEV = window.SHOR_CONFIG.IS_DEV === true;
+
+const $ = id => document.getElementById(id);
+const DEVELOP_MS = 5000;
+/* 配信対象からの除外（distributable_until）はサーバ側(select_drift RPC)が判定する。
+   ここでは物理削除（プライバシー要件、DISTRIBUTION_SPEC.md の STORAGE_TTL）のみ扱う。 */
+const STORAGE_EXPIRE_MS = 30 * 24 * 60 * 60 * 1000;
+
+const DEV_SKIP_EXIF = IS_DEV;
+
+const todayStr = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+};
+const yesterdayStr = () => {
+  const d = new Date(); d.setDate(d.getDate()-1);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+};
+
+/* ---------- ユーザーID (localStorage で永続化) ---------- */
+let userId = localStorage.getItem("shor:uid");
+if (!userId) { userId = crypto.randomUUID(); localStorage.setItem("shor:uid", userId); }
+
+/* ---------- 日次状態 (localStorage) ---------- */
+const store = {
+  get(k, fb){ try{ const v = localStorage.getItem("shor:"+k); return v===null?fb:JSON.parse(v); }catch(e){ return fb; } },
+  set(k, v){ try{ localStorage.setItem("shor:"+k, JSON.stringify(v)); }catch(e){} }
+};
+
+/* ============================================================
+   Supabase API
+   ============================================================ */
+
+async function initUser(){
+  await db.from("users").upsert(
+    { id: userId, last_active_at: new Date().toISOString() },
+    { onConflict: "id" }
+  );
+}
+
+/* 配信候補の選択（加重ランダム・シードへのフォールバック）は peek_drift RPCで行う。
+   ここでは「見せるだけ」で、view_countの予約や視聴履歴の記録などの副作用は起こさない。
+   実際の予約（1日の視聴上限チェック・view_countの競合安全な増分・view_history挿入）は
+   現像が完了した瞬間に confirmDrift() から confirm_drift RPCを呼んで行う。
+   DISTRIBUTION_SPEC.md 6章参照。 */
+async function getRandomDrift(){
+  const { data, error } = await db.rpc("peek_drift", { p_viewer_id: userId });
+  if (error || !data || data.length === 0) return null;
+  return data[0];
+}
+
+/* 現像完了時に呼ぶ。予約が成立すれば true。稀に peek 後の競合/期限切れ/
+   視聴上限到達で失敗することがあるが、その場合も体験上は視聴を継続させ、
+   サーバ側の集計（view_count等）にだけ反映されない扱いとする。 */
+async function confirmDrift(postId){
+  if (!postId) return false;
+  const { data, error } = await db.rpc("confirm_drift", { p_viewer_id: userId, p_post_id: postId });
+  if (error){ console.error(error); return false; }
+  return data === true;
+}
+
+async function cleanupOldPosts(){
+  const cutoff = new Date(Date.now() - STORAGE_EXPIRE_MS).toISOString();
+  const { data: expired } = await db.from("posts").select("id, image_url").lt("created_at", cutoff);
+  if (!expired || expired.length === 0) return;
+
+  const ids = expired.map(p => p.id);
+  const paths = expired.map(p => p.image_url.split("/public/photos/")[1]).filter(Boolean);
+
+  if (paths.length) await db.storage.from("photos").remove(paths);
+  await db.from("view_history").delete().in("post_id", ids);
+  await db.from("posts").delete().in("id", ids);
+}
+
+async function uploadPhoto(dataUrl){
+  const res = await fetch(dataUrl);
+  const blob = await res.blob();
+  const fileName = `${crypto.randomUUID()}.jpg`;
+  const { error } = await db.storage.from("photos").upload(fileName, blob, {
+    contentType: "image/jpeg", cacheControl: "3600"
+  });
+  if (error) throw error;
+  const { data: { publicUrl } } = db.storage.from("photos").getPublicUrl(fileName);
+  return publicUrl;
+}
+
+async function createPost(imageUrl, message){
+  const { error } = await db.from("posts").insert({
+    author_id: userId,
+    image_url: imageUrl,
+    message: message
+  });
+  if (error) throw error;
+}
+
+async function recordViewHistoryDB(postId, viewedSeconds){
+  /* select_drift RPC が選定時点で viewed_seconds=0 の行を予約済みなので、確定値で更新する。
+     posts.total_viewed_seconds への加算はDBトリガーが行う。 */
+  await db.from("view_history")
+    .update({ viewed_seconds: Math.round(viewedSeconds * 10) / 10 })
+    .eq("viewer_id", userId)
+    .eq("post_id", postId);
+}
+
+async function getResultForDate(dateStr){
+  const yStart = new Date(dateStr + "T00:00:00").toISOString();
+  const yEnd   = new Date(dateStr + "T23:59:59").toISOString();
+
+  const { data: myPosts } = await db.from("posts")
+    .select("id")
+    .eq("author_id", userId)
+    .gte("created_at", yStart)
+    .lte("created_at", yEnd);
+
+  if (!myPosts || myPosts.length === 0) return null;
+
+  const postIds = myPosts.map(p => p.id);
+  const { data: views } = await db.from("view_history")
+    .select("viewed_seconds")
+    .in("post_id", postIds);
+
+  if (!views || views.length === 0) return 0;
+  return Math.round(views.reduce((sum, v) => sum + v.viewed_seconds, 0));
+}
+
+/* ---------- 長押しメニュー等の最終防衛線 ---------- */
+["contextmenu","selectstart","dragstart"].forEach(ev =>
+  document.addEventListener(ev, e => e.preventDefault(), { passive:false }));
+
+/* ---------- ささやき通知 ---------- */
+let whisperTimer = null;
+function whisper(text, ms = 3600){
+  const w = $("whisper");
+  w.innerHTML = text;
+  w.classList.add("show");
+  clearTimeout(whisperTimer);
+  whisperTimer = setTimeout(() => w.classList.remove("show"), ms);
+}
+
+/* ---------- 画面遷移 ---------- */
+let current = null;
+function show(id){
+  document.querySelectorAll(".screen").forEach(s => s.classList.toggle("active", s.id === id));
+  current = id;
+}
+
+/* ============================================================
+   閲覧権モデル（1日でリセット）
+   ============================================================ */
+function freeUsedToday(){ return store.get("viewFreeUsed", null) === todayStr(); }
+function useFreeGrant(){ store.set("viewFreeUsed", todayStr()); }
+
+function postGrants(){
+  const g = store.get("postGrants", null);
+  return (g && g.date === todayStr()) ? (g.count || 0) : 0;
+}
+function addPostGrant(){
+  const g = store.get("postGrants", null);
+  if (g && g.date === todayStr() && g.granted) return;
+  store.set("postGrants", { date: todayStr(), count: postGrants() + 1, granted: true });
+}
+function consumePostGrant(){
+  const g = store.get("postGrants", null);
+  const grantedToday = g && g.date === todayStr() && g.granted;
+  store.set("postGrants", { date: todayStr(), count: Math.max(0, postGrants() - 1), granted: grantedToday });
+}
+function canView(){ return !freeUsedToday() || postGrants() > 0; }
+function consumeView(){
+  if (!freeUsedToday()) useFreeGrant();
+  else consumePostGrant();
+}
+
+/* ============================================================
+   画面1: ダッシュボード
+   ============================================================ */
+let pendingResult = null;
+let afterResultAction = null;
+
+async function renderHome(){
+  $("home-a").hidden = false;
+  show("scr-home");
+
+  pendingResult = null;
+  const lastPostDate = store.get("lastPostDate", null);
+
+  if (lastPostDate && lastPostDate < todayStr()){
+    const confirmKey = "resultConfirmed:" + lastPostDate;
+    if (!store.get(confirmKey, false)){
+      const seconds = await getResultForDate(lastPostDate);
+      if (seconds !== null) pendingResult = { date: lastPostDate, seconds };
+    }
+  }
+}
+
+/* 保留中の前日結果があればモーダルを先に見せ、閉じてから本来の遷移を行う */
+function withResultGate(action){
+  if (pendingResult){
+    const { date, seconds } = pendingResult;
+    pendingResult = null;
+    store.set("resultConfirmed:" + date, true);
+    $("result-sec").textContent = seconds;
+    afterResultAction = action;
+    openResultModal();
+  } else {
+    action();
+  }
+}
+
+/* ============================================================
+   画面2: 閲覧（現像）
+   ============================================================ */
+let viewOrigin = "home";
+let heldTotalSec = 0;
+let currentPostId = null;
+let introTimers = [];
+
+async function openView(origin){
+  viewOrigin = origin;
+
+  /* 先に画面を表示してからフェッチ */
+  resetDevelop(true);
+  $("view-polaroid").classList.remove("washed");
+  $("view-caption").textContent = "";
+  $("view-pic").style.backgroundImage = "";
+  heldTotalSec = 0;
+  currentPostId = null;
+
+  const intro = $("view-intro"), stage = $("view-polaroid"), snote = $("view-screen-note");
+  intro.classList.remove("show");
+  stage.classList.add("pending");
+  snote.classList.add("pending");
+  show("scr-view");
+
+  const drift = await getRandomDrift();
+
+  if (!drift){
+    whisper("まだ写真が届いていません。あなたが最初の一人になりませんか？", 5000);
+    setTimeout(() => {
+      if (viewOrigin === "done") backToDone();
+      else renderHome();
+    }, 1400);
+    return;
+  }
+
+  currentPostId = drift.id;
+  $("view-caption").textContent = drift.message || "";
+  $("view-pic").style.backgroundImage = `url("${drift.image_url}")`;
+
+  introTimers.forEach(clearTimeout); introTimers = [];
+  introTimers.push(setTimeout(() => intro.classList.add("show"), 1250));
+  introTimers.push(setTimeout(() => intro.classList.remove("show"), 2800));
+  introTimers.push(setTimeout(() => {
+    stage.classList.remove("pending");
+    snote.classList.remove("pending");
+  }, 3700));
+}
+
+/* ---- 現像インタラクション ---- */
+const zone = $("dev-zone"), pic = $("view-pic"),
+      frost = $("view-frost"), note = $("under-note"), devLabel = $("dev-label");
+let pressing = false, raf = 0, t0 = 0, developed = false, noteTimer = 0, leaving = false;
+let confirmPromise = null;
+
+function resetDevelop(hard){
+  developed = false; pressing = false;
+  confirmPromise = null;
+  cancelAnimationFrame(raf);
+  zone.classList.remove("pressing");
+  pic.style.filter = "blur(26px) saturate(.92)";
+  frost.style.opacity = "1";
+  devLabel.style.opacity = "1";
+  if (hard){ note.classList.remove("show"); note.textContent = ""; }
+}
+
+function tick(now){
+  if (!pressing) return;
+  const t = Math.min((now - t0) / DEVELOP_MS, 1);
+  const e = 1 - Math.pow(1 - t, 2);
+  pic.style.filter = `blur(${26 * (1 - e)}px) saturate(${.92 + .08 * e})`;
+  frost.style.opacity = String(1 - e);
+  if (t >= 1 && !developed){
+    developed = true;
+    consumeView(); /* 枠の消費は現像が完了した段階で行う */
+    confirmPromise = confirmDrift(currentPostId); /* サーバ側の予約もここで初めて行う */
+    devLabel.style.opacity = ".35";
+    note.innerHTML = "写真が現像されました。<br>指を離すと写真は見られなくなります。";
+    note.classList.add("show");
+  }
+  if (t < 1) raf = requestAnimationFrame(tick);
+}
+
+zone.addEventListener("pointerdown", e => {
+  if (leaving) return;
+  e.preventDefault();
+  zone.setPointerCapture(e.pointerId);
+  pressing = true; t0 = performance.now();
+  zone.classList.add("pressing");
+  clearTimeout(noteTimer);
+  if (!developed){ note.classList.remove("show"); }
+  raf = requestAnimationFrame(tick);
+});
+
+function release(){
+  if (!pressing || leaving) return;
+  pressing = false;
+  cancelAnimationFrame(raf);
+  const heldSec = Math.round((performance.now() - t0) / 100) / 10;
+  heldTotalSec += heldSec;
+
+  if (developed){
+    leaving = true;
+    zone.classList.remove("pressing");
+    /* confirmDrift() の view_history 挿入が先に届いてから確定秒数を更新する
+       （順序が逆になると更新が0件のまま失われるため）。UIの遷移は待たせない。 */
+    const pid = currentPostId, finalSec = heldTotalSec, pending = confirmPromise;
+    (async () => {
+      if (pending) await pending.catch(() => {});
+      if (pid) await recordViewHistoryDB(pid, finalSec);
+    })();
+    $("view-polaroid").classList.add("washed");
+    $("view-screen-note").classList.add("fading");
+    setTimeout(() => {
+      leaving = false;
+      [$("view-polaroid")].forEach(el => {
+        const prev = el.style.transition;
+        el.style.transition = "none";
+        el.classList.add("pending");
+        void el.offsetWidth;
+        el.style.transition = prev;
+      });
+      const snote = $("view-screen-note");
+      snote.style.transition = "none";
+      snote.classList.remove("fading");
+      snote.classList.add("pending");
+      void snote.offsetWidth;
+      snote.style.transition = "";
+      if (viewOrigin === "done") backToDone();
+      else openPost();
+    }, 1500);
+  } else {
+    resetDevelop(false);
+    note.textContent = "現像するには指を置いたままにしてください";
+    note.classList.add("show");
+    clearTimeout(noteTimer);
+    noteTimer = setTimeout(() => note.classList.remove("show"), 3000);
+  }
+}
+zone.addEventListener("pointerup", release);
+zone.addEventListener("pointercancel", release);
+
+/* ============================================================
+   画面3: 投稿（海に流す）
+   ============================================================ */
+const capInput = $("cap-input"), capCounter = $("cap-counter"),
+      btnSend = $("btn-send"), btnPick = $("btn-pick"),
+      fileInput = $("file-input"), postPic = $("post-pic");
+let pickedDataUrl = null;
+
+function openPost(){
+  $("post-lead").hidden = false;
+  $("post-polaroid").hidden = false;
+  show("scr-post");
+}
+
+function postValid(){
+  const len = [...capInput.value].length;
+  return pickedDataUrl !== null && len <= 15;
+}
+function refreshPostUI(){
+  const len = [...capInput.value].length;
+  capCounter.textContent = `${len}/15`;
+  capCounter.classList.toggle("over", len > 15);
+  capInput.classList.toggle("over", len > 15);
+  btnSend.disabled = !postValid();
+}
+capInput.addEventListener("input", refreshPostUI);
+capInput.addEventListener("keydown", e => {
+  if (e.key === "Enter"){ e.preventDefault(); capInput.blur(); }
+});
+
+btnPick.addEventListener("click", () => fileInput.click());
+
+fileInput.addEventListener("change", async () => {
+  const file = fileInput.files && fileInput.files[0];
+  fileInput.value = "";
+  if (!file) return;
+  const buf = await file.arrayBuffer();
+  if (!DEV_SKIP_EXIF && !hasCameraExif(buf)){
+    whisper("投稿できるのは、カメラで撮影された写真のみです。");
+    return;
+  }
+  pickedDataUrl = await downscale(file, 1280);
+  postPic.style.backgroundImage = `url("${pickedDataUrl}")`;
+  postPic.classList.add("loaded");
+  btnPick.classList.add("hidden");
+  refreshPostUI();
+});
+
+btnSend.addEventListener("click", async () => {
+  if (!postValid()) return;
+  btnSend.disabled = true;
+  btnSend.textContent = "送信中…";
+
+  try {
+    const imageUrl = await uploadPhoto(pickedDataUrl);
+    await createPost(imageUrl, capInput.value);
+    store.set("lastPostDate", todayStr());
+    addPostGrant();
+
+    $("post-polaroid").classList.add("washed");
+    $("post-lead").classList.add("gone");
+    setTimeout(() => {
+      const body = $("done-body");
+      body.style.transition = "none";
+      body.classList.add("pending");
+      void body.offsetWidth;
+      body.style.transition = "";
+      openDone();
+      setTimeout(() => {
+        $("done-body").classList.remove("pending");
+        const pol = $("post-polaroid"), lead = $("post-lead");
+        const prevPol = pol.style.transition, prevLead = lead.style.transition;
+        pol.style.transition = "none"; lead.style.transition = "none";
+        pol.classList.remove("washed");
+        lead.classList.remove("gone");
+        resetPostForm();
+        void pol.offsetWidth;
+        pol.style.transition = prevPol; lead.style.transition = prevLead;
+      }, 1250);
+    }, 900);
+  } catch(err) {
+    btnSend.disabled = false;
+    btnSend.textContent = "海に流す";
+    whisper("送信に失敗しました。もう一度お試しください。", 5000);
+  }
+});
+
+function resetPostForm(){
+  capInput.value = ""; pickedDataUrl = null;
+  postPic.style.backgroundImage = "none";
+  postPic.classList.remove("loaded");
+  btnPick.classList.remove("hidden");
+  btnPick.textContent = "＋ 写真を選ぶ";
+  btnSend.textContent = "海に流す";
+  refreshPostUI();
+}
+
+/* --- 最小JPEG EXIFパーサ --- */
+function hasCameraExif(buffer){
+  try{
+    const v = new DataView(buffer);
+    if (v.getUint16(0) !== 0xFFD8) return false;
+    let o = 2;
+    while (o + 4 < v.byteLength){
+      if (v.getUint8(o) !== 0xFF) break;
+      const marker = v.getUint8(o + 1), size = v.getUint16(o + 2);
+      if (marker === 0xE1){
+        const base = o + 4;
+        if (v.getUint32(base) === 0x45786966){
+          const tiff = base + 6;
+          const little = v.getUint16(tiff) === 0x4949;
+          const u16 = p => v.getUint16(p, little), u32 = p => v.getUint32(p, little);
+          const ifd0 = tiff + u32(tiff + 4);
+          const n = u16(ifd0);
+          for (let i = 0; i < n; i++){
+            const tag = u16(ifd0 + 2 + i * 12);
+            if (tag === 0x010F || tag === 0x0110) return true;
+          }
+          return false;
+        }
+      }
+      if (marker === 0xDA) break;
+      o += 2 + size;
+    }
+    return false;
+  }catch(e){ return false; }
+}
+
+function downscale(file, max){
+  return new Promise(res => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const r = Math.min(1, max / Math.max(img.width, img.height));
+      const c = document.createElement("canvas");
+      c.width = Math.round(img.width * r); c.height = Math.round(img.height * r);
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      res(c.toDataURL("image/jpeg", .82));
+    };
+    img.src = url;
+  });
+}
+
+/* ============================================================
+   画面4: 投稿完了
+   ============================================================ */
+function openDone(){ show("scr-done"); }
+function backToDone(){
+  const body = $("done-body");
+  body.style.transition = "none";
+  body.classList.remove("pending");
+  void body.offsetWidth;
+  body.style.transition = "";
+  show("scr-done");
+}
+
+$("btn-give2see").addEventListener("click", () => {
+  if (!canView()){
+    openNotice("未開封のボトルメールは以上です。<br>また明日、のぞきに来てください。");
+    return;
+  }
+  openView("done");
+});
+$("btn-post-again").addEventListener("click", () => openPost());
+$("post-to-top").addEventListener("click", () => renderHome());
+$("done-to-top").addEventListener("click", () => renderHome());
+$("home-to-post").addEventListener("click", () => withResultGate(() => openPost()));
+
+/* --- PWAインストール --- */
+let deferredPrompt = null;
+window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); deferredPrompt = e; });
+$("btn-pwa").addEventListener("click", async () => {
+  if (deferredPrompt){ deferredPrompt.prompt(); await deferredPrompt.userChoice; deferredPrompt = null; }
+  else whisper("お使いのブラウザの共有メニューから「ホーム画面に追加」を選んでください。", 5200);
+});
+
+/* ============================================================
+   起動
+   ============================================================ */
+function showModal(id){
+  const m = $(id); m.hidden = false; void m.offsetWidth; m.classList.add("show");
+}
+function hideModal(id){
+  const m = $(id); m.classList.remove("show");
+  setTimeout(() => { m.hidden = true; }, 700);
+}
+function openResultModal(){ showModal("result-modal"); }
+function closeResultModal(){
+  hideModal("result-modal");
+  if (afterResultAction){
+    const action = afterResultAction;
+    afterResultAction = null;
+    setTimeout(action, 700);
+  }
+}
+function openNotice(html){ $("notice-text").innerHTML = html; showModal("notice-modal"); }
+function closeNotice(){ hideModal("notice-modal"); }
+
+$("result-close").addEventListener("click", closeResultModal);
+$("result-modal").addEventListener("click", e => {
+  if (e.target === $("result-modal")) closeResultModal();
+});
+$("notice-close").addEventListener("click", closeNotice);
+$("notice-modal").addEventListener("click", e => {
+  if (e.target === $("notice-modal")) closeNotice();
+});
+
+$("btn-see").addEventListener("click", () => withResultGate(() => {
+  if (!canView()){
+    const g = store.get("postGrants", null);
+    const postedToday = g && g.date === todayStr() && g.granted;
+    if (postedToday){
+      openNotice("未開封のボトルメールは以上です。<br>また明日、のぞきに来てください。");
+    } else {
+      openNotice("ボトルメールは1日1通だけ届きます。<br>自分のボトルメールを海に流すと、<br>追加で1通だけ届きます。");
+    }
+    return;
+  }
+  openView("home");
+}));
+
+/* ===== 開発テスト用（IS_DEVでのみ有効。本番configでは devbar 自体を除去する） ===== */
+if (IS_DEV){
+  $("dev-yesterday").addEventListener("click", () => {
+    store.set("lastPostDate", yesterdayStr());
+    store.set("resultConfirmed:" + yesterdayStr(), false);
+    location.reload();
+  });
+  $("dev-reset").addEventListener("click", () => {
+    Object.keys(localStorage)
+      .filter(k => k.startsWith("shor:") && k !== "shor:uid")
+      .forEach(k => localStorage.removeItem(k));
+    location.reload();
+  });
+  $("dev-skip").addEventListener("click", async () => {
+    const lastDate = store.get("lastPostDate", null);
+    if (!lastDate){
+      whisper("まだ投稿がありません。先に「海に流す」を試してください。");
+      return;
+    }
+    const yStr = yesterdayStr();
+    const yStart = new Date(lastDate + "T00:00:00").toISOString();
+    /* Supabaseの投稿のcreated_atも昨日に書き換え、日付クエリが一致するようにする */
+    await db.from("posts")
+      .update({ created_at: new Date(yStr + "T12:00:00").toISOString() })
+      .eq("author_id", userId)
+      .gte("created_at", yStart);
+    store.set("lastPostDate", yStr);
+    location.reload();
+  });
+} else {
+  $("devbar").remove();
+}
+
+$("link-privacy").addEventListener("click", e => { e.preventDefault(); whisper("プライバシーポリシーは準備中です。"); });
+$("link-contact").addEventListener("click", e => { e.preventDefault(); whisper("お問い合わせ窓口は準備中です。"); });
+
+initUser().catch(console.error);
+cleanupOldPosts().catch(console.error);
+renderHome();
+})();
+</script>
+</body>
+</html>
