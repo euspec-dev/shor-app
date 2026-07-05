@@ -11,11 +11,24 @@
   指す`config.js`（`IS_DEV: false`）を明示的にコミットする。
 - GitHub Pagesが`production`ブランチの中身をそのままインターネットに公開する。
   知人に渡すURLはそこで発行される。
+- `production`ブランチは、`main`と同じフォルダではなく**`git worktree`で
+  別フォルダ（`../shor-app-production`）にチェックアウトして操作する**
+  （理由は下の「⚠️ 注意」参照）。
 
 `config.js`の中身（Supabaseの`anon`/`publishable`キー）は、元々ブラウザに
 そのまま埋め込まれて公開される前提の値なので、`production`ブランチに
 コミットして公開しても問題ない（本番ページを公開する時点でどのみち
 ソースから見えるため）。
+
+### ⚠️ 注意: 同じフォルダで`git checkout production`しないこと
+
+`config.js`は`main`では`.gitignore`対象（追跡されていない）、
+`production`では追跡対象（コミット済み）というファイルなので、同じフォルダで
+`git checkout production` → `git checkout main`と行き来すると、**`main`に
+戻った瞬間に`config.js`がフォルダから消える**（gitが「productionには
+あったがmainには無いファイル」として削除するため）。これは実際に本番展開の
+際に起きた事象。`git worktree`で作業フォルダ自体を分ければ、この問題は
+一切起こらない。
 
 ## 初回セットアップ（最初の1回だけ）
 
@@ -33,12 +46,18 @@ git push -u origin main
 
 ### 2. `production`ブランチを作り、本番用`config.js`だけをコミットする
 
+`main`と同じフォルダではなく、隣に専用フォルダを作ってそちらで作業する:
+
 ```
 git checkout -b production
+git worktree add ../shor-app-production production
+git checkout main
 ```
 
-`config.js`の中身を、本番用Supabaseプロジェクトの値に書き換える
-（`IS_DEV`は必ず`false`）:
+（最後の`git checkout main`で、元のフォルダを開発用の状態に戻しておく）
+
+`../shor-app-production/config.js`の中身を、本番用Supabaseプロジェクトの
+値に書き換える（`IS_DEV`は必ず`false`）:
 
 ```js
 window.SHOR_CONFIG = {
@@ -48,7 +67,8 @@ window.SHOR_CONFIG = {
 };
 ```
 
-書き換えたら、`.gitignore`に反していても明示的に追加する:
+書き換えたら、`../shor-app-production`フォルダの中で
+（`.gitignore`に反していても明示的に追加する）:
 
 ```
 git add -f config.js
@@ -80,15 +100,18 @@ https://euspec-dev.github.io/shor-app/shor.html
 
 ## 通常運用: 変更を本番に反映する
 
-1. `main`ブランチで開発・動作確認する（ローカルの開発用`config.js`のまま）
-2. 本番に反映したい変更ができたら、`production`ブランチに取り込む:
+1. いつも通り`shor-app`フォルダ（`main`ブランチ）で開発・動作確認する
+   （ローカルの開発用`config.js`のまま）
+2. 本番に反映したい変更ができたら、`../shor-app-production`フォルダに移動して
+   取り込む:
    ```
-   git checkout production
+   cd ../shor-app-production
    git merge main
    git push
    ```
    （`config.js`は`main`側では管理されていないファイルなので、`merge`しても
-   `production`側の本番用`config.js`は上書きされない）
+   `production`側の本番用`config.js`は上書きされない。`shor-app`フォルダ側は
+   ずっと`main`のままなので触らなくてよい）
 3. push後、1〜2分でGitHub Pagesに自動反映される
 4. デプロイ前に[release-checklist.md](release-checklist.md)を確認する
 
