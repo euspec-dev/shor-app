@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#34363b">
 <title>SHOR. — 感性を、波間に浮かべる。</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@200;300;400;500&family=Noto+Sans+JP:wght@200;300;400&display=swap" rel="stylesheet">
@@ -949,12 +951,31 @@ $("post-to-top").addEventListener("click", () => renderHome());
 $("done-to-top").addEventListener("click", () => renderHome());
 $("home-to-post").addEventListener("click", () => withResultGate(() => openPost()));
 
-/* --- PWAインストール --- */
+/* --- PWAインストール ---
+   manifest.json / service-worker.js / icons が揃って初めて、Chromium系ブラウザで
+   beforeinstallprompt が発火するようになる（このいずれかが欠けていると
+   永久に発火せず、常にフォールバック分岐に落ちる）。 */
+if ("serviceWorker" in navigator){
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("service-worker.js").catch(console.error);
+  });
+}
+
 let deferredPrompt = null;
 window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); deferredPrompt = e; });
+
+/* beforeinstallprompt に対応していないブラウザ（iOS/macOS Safari等）向けの案内。
+   OSを判定して、実際に押す場所まで具体的に示す。 */
+function pwaFallbackMessage(){
+  const ua = navigator.userAgent;
+  const isIOS = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  if (isIOS) return "Safari下部の共有ボタン（□に↑）をタップし、<br>「ホーム画面に追加」を選んでください。";
+  return "お使いのブラウザのメニューから<br>「ホーム画面に追加」または「アプリをインストール」を選んでください。";
+}
+
 $("btn-pwa").addEventListener("click", async () => {
   if (deferredPrompt){ deferredPrompt.prompt(); await deferredPrompt.userChoice; deferredPrompt = null; }
-  else whisper("お使いのブラウザの共有メニューから「ホーム画面に追加」を選んでください。", 5200);
+  else whisper(pwaFallbackMessage(), 5200);
 });
 
 /* ============================================================

@@ -48,6 +48,19 @@
 - [ ] ストレージの画像を手動で消しても`posts`/`view_history`が連動して
       消えるトリガーが本番にも入っている
 
+## PWA（ホーム画面に追加）
+
+- [ ] `manifest.json` / `service-worker.js` / `icons/icon-192.png` /
+      `icons/icon-512.png` が本番URLで実際に開ける（404になっていない）
+- [ ] Chrome/Edge/Android等で本番URLを開き、「ホーム画面に追加する」ボタンを
+      押すと**ブラウザ標準のインストールダイアログ**が出る
+      （出ない場合は`manifest.json`のパス・アイコンパスや、
+      Service Workerの登録エラーがないか開発者ツールのConsoleで確認する）
+- [ ] iOS Safariで本番URLを開き、同ボタンを押すと「Safari下部の共有ボタン
+      （□に↑）をタップし、ホーム画面に追加を選んでください」という案内が出る
+      （iOS/iPadOS Safariは`beforeinstallprompt`に対応していないため、
+      自動ダイアログではなく案内文が出るのが正しい挙動）
+
 ## 最終確認
 
 - [ ] 本番URLを外部の実ブラウザ（IDEの埋め込みプレビューではない）で開き、
