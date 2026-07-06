@@ -1,0 +1,13 @@
+{
+  "name": "SHOR. — 感性を、波間に浮かべる。",
+  "short_name": "SHOR.",
+  "start_url": "./shor.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#34363b",
+  "theme_color": "#34363b",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}

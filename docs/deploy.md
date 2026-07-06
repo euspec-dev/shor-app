@@ -115,6 +115,10 @@ https://euspec-dev.github.io/shor-app/shor.html
 3. push後、1〜2分でGitHub Pagesに自動反映される
 4. デプロイ前に[release-checklist.md](release-checklist.md)を確認する
 
+`manifest.json` / `service-worker.js` / `icons/`（PWA関連ファイル）は
+`config.js`と違い`main`側でも普通にコミットされているファイルなので、
+`git merge main`だけで自動的に`production`側にも反映される。特別な作業は不要。
+
 ## URLの確認場所（再掲）
 
 `https://github.com/euspec-dev/shor-app` → Settings → Pages に、現在公開中の
