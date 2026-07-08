@@ -403,7 +403,7 @@ footer a{color:inherit;text-decoration:none;border-bottom:1px solid rgba(207,201
         <button class="to-top" id="done-to-top" type="button" style="margin-top:1.8em;padding-top:0">TOPへ戻る</button>
       </div>
       <div class="done-foot">
-        <p class="small">現在はプロトタイプとしてひっそりと開かれています。<br>もし気に入っていただけたなら、<br>ホーム画面に追加して応援してください。</p>
+        <p class="small" id="pwa-note">現在はプロトタイプとしてひっそりと開かれています。<br>もし気に入っていただけたなら、<br>ホーム画面に追加して応援してください。</p>
         <button class="btn done-pwa" id="btn-pwa">ホーム画面に追加する</button>
       </div>
     </div>
@@ -1039,9 +1039,20 @@ function pwaFallbackMessage(){
   return "お使いのブラウザのメニューから<br>「ホーム画面に追加」または「アプリをインストール」を選んでください。";
 }
 
+/* whisper()は固定位置なので、コンテンツの多いscr-doneでは"ホーム画面に追加する"
+   ボタンと重なってしまう。既存の.small文言をその場で差し替えて案内する */
+const pwaNote = $("pwa-note");
+const PWA_NOTE_DEFAULT = pwaNote.innerHTML;
+let pwaNoteTimer = null;
+function showPwaNote(text, ms = 5200){
+  clearTimeout(pwaNoteTimer);
+  pwaNote.innerHTML = text;
+  pwaNoteTimer = setTimeout(() => { pwaNote.innerHTML = PWA_NOTE_DEFAULT; }, ms);
+}
+
 $("btn-pwa").addEventListener("click", async () => {
   if (deferredPrompt){ deferredPrompt.prompt(); await deferredPrompt.userChoice; deferredPrompt = null; }
-  else whisper(pwaFallbackMessage(), 5200);
+  else showPwaNote(pwaFallbackMessage(), 5200);
 });
 
 /* ============================================================
