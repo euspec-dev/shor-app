@@ -785,7 +785,7 @@ function release(){
       snote.classList.add("pending");
       void snote.offsetWidth;
       snote.style.transition = "";
-      if (viewOrigin === "done") backToDone();
+      if (viewOrigin === "done") renderHome();
       else openPost();
     }, 1500);
   } else {
