@@ -249,6 +249,15 @@ footer a{color:inherit;text-decoration:none;border-bottom:1px solid rgba(207,201
   transition:opacity 500ms ease;background:transparent;border:none;
 }
 .pick.hidden{opacity:0;pointer-events:none}
+/* 投稿できない写真を選んだ際のお知らせ。「＋ 写真を選ぶ」はそのまま残し、
+   その下に重ねる。フェードの出し方は#whisperを踏襲しつつ、durationは長めに */
+.photo-note{position:absolute;left:0;right:0;top:calc(50% + 22px);
+  padding:0 16px;text-align:center;
+  font-size:10px;font-weight:300;letter-spacing:.18em;line-height:1.9;
+  color:var(--ink-mist);opacity:0;pointer-events:none;
+  transition:opacity 1400ms ease;
+  text-shadow:0 1px 12px rgba(20,22,26,.6)}
+.photo-note.show{opacity:1}
 .pick:focus-visible{outline:1px dashed rgba(245,241,232,.5);outline-offset:-8px}
 .send-btn{
   appearance:none;width:100%;background:transparent;font:inherit;cursor:pointer;
@@ -366,6 +375,7 @@ footer a{color:inherit;text-decoration:none;border-bottom:1px solid rgba(207,201
       <div class="photo">
         <div class="post-img" id="post-pic"></div>
         <button class="pick" id="btn-pick" type="button">＋ 写真を選ぶ</button>
+        <div class="photo-note" id="photo-note"></div>
         <input type="file" id="file-input" accept="image/*" hidden>
       </div>
       <div class="skirt">
@@ -806,8 +816,19 @@ zone.addEventListener("pointercancel", release);
    ============================================================ */
 const capInput = $("cap-input"), capCounter = $("cap-counter"),
       btnSend = $("btn-send"), btnPick = $("btn-pick"),
-      fileInput = $("file-input"), postPic = $("post-pic");
+      fileInput = $("file-input"), postPic = $("post-pic"), photoNote = $("photo-note");
 let pickedDataUrl = null;
+const PICK_LABEL = "＋ 写真を選ぶ";
+let photoNoteTimer = null;
+/* whisper()は画面下部で視認性が低いため、写真エリア(黒い四角)に重ねて
+   伝える。フェードの出し方はwhisper()（#whisper.show）を踏襲しつつ、
+   durationは1400msに延ばしている（.photo-note参照） */
+function showPickError(text, ms = 3600){
+  clearTimeout(photoNoteTimer);
+  photoNote.textContent = text;
+  photoNote.classList.add("show");
+  photoNoteTimer = setTimeout(() => photoNote.classList.remove("show"), ms);
+}
 
 function openPost(){
   $("post-lead").hidden = false;
@@ -839,7 +860,7 @@ fileInput.addEventListener("change", async () => {
   if (!file) return;
   const buf = await file.arrayBuffer();
   if (!DEV_SKIP_EXIF && !hasCameraExif(buf) && !isHeic(buf)){
-    whisper("投稿できるのは、カメラで撮影された写真のみです。");
+    showPickError("カメラで撮影した写真のみ選べます");
     return;
   }
   pickedDataUrl = await downscale(file, 1280);
@@ -893,7 +914,9 @@ function resetPostForm(){
   postPic.style.backgroundImage = "none";
   postPic.classList.remove("loaded");
   btnPick.classList.remove("hidden");
-  btnPick.textContent = "＋ 写真を選ぶ";
+  btnPick.textContent = PICK_LABEL;
+  clearTimeout(photoNoteTimer);
+  photoNote.classList.remove("show");
   btnSend.textContent = "海に流す";
   refreshPostUI();
 }
