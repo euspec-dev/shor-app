@@ -88,7 +88,9 @@ body{
 }
 
 /* ============ レイアウト ============ */
-#app{position:fixed;inset:0;display:grid;place-items:center;
+#app{position:fixed;top:0;left:0;right:0;
+  height:100vh;height:100dvh; /* dvh未対応ブラウザ向けにvhをフォールバックとして残す */
+  display:grid;place-items:center;
   padding:calc(58px + env(safe-area-inset-top)) 22px calc(60px + env(safe-area-inset-bottom));
 }
 .screen{
@@ -836,7 +838,7 @@ fileInput.addEventListener("change", async () => {
   fileInput.value = "";
   if (!file) return;
   const buf = await file.arrayBuffer();
-  if (!DEV_SKIP_EXIF && !hasCameraExif(buf)){
+  if (!DEV_SKIP_EXIF && !hasCameraExif(buf) && !isHeic(buf)){
     whisper("投稿できるのは、カメラで撮影された写真のみです。");
     return;
   }
@@ -924,6 +926,20 @@ function hasCameraExif(buffer){
       o += 2 + size;
     }
     return false;
+  }catch(e){ return false; }
+}
+
+/* iOSのカメラは既定でHEIC形式（JPEGではない）で撮影されるため、上のJPEG専用
+   EXIFパーサでは弾かれてしまう。HEIC/HEIFはスクリーンショット(PNG)やWeb上の
+   画像(JPEG/PNG/WebP)としてはまず流通しない実質カメラ専用形式なので、
+   EXIF解析はせず拡張子代わりのシグネチャ判定だけで許可する。 */
+function isHeic(buffer){
+  try{
+    if (buffer.byteLength < 12) return false;
+    const v = new DataView(buffer);
+    if (v.getUint32(4) !== 0x66747970) return false; /* "ftyp" */
+    const brand = String.fromCharCode(v.getUint8(8), v.getUint8(9), v.getUint8(10), v.getUint8(11));
+    return ["heic","heix","heim","heis","hevc","hevx","hevm","hevs","mif1","msf1"].includes(brand);
   }catch(e){ return false; }
 }
 
