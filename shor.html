@@ -35,6 +35,7 @@
   --warmth:226,164,118;        /* 体温の色（夕暮れの残光のような、落ち着いた温かい琥珀）RGB */
   --line:rgba(245,241,232,.28);
   --dur-fade:1100ms;
+  --dur-fade-photo:1600ms; /* 写真は前置きメッセージ等より体感速度が速く感じるため個別に長め */
 }
 
 *{margin:0;padding:0;box-sizing:border-box}
@@ -159,14 +160,14 @@ footer a{color:inherit;text-decoration:none;border-bottom:1px solid rgba(207,201
 
 /* 閲覧前の前置き演出: メッセージを見せてからポラロイドへ */
 .view-intro{position:absolute;top:50%;left:0;right:0;transform:translateY(-50%);
-  opacity:0;transition:opacity 1100ms ease;pointer-events:none}
+  opacity:0;transition:opacity var(--dur-fade) ease;pointer-events:none}
 .view-intro.show{opacity:1}
-.view-stage{transition:opacity 1100ms ease, transform 1400ms ease, visibility 0s}
+.view-stage{transition:opacity var(--dur-fade-photo) ease, transform 1400ms ease, visibility 0s}
 .view-stage.pending{opacity:0;pointer-events:none;visibility:hidden;
-  transition:opacity 1100ms ease, transform 1400ms ease, visibility 0s linear 1100ms}  /* 前置き中は完全に伏せる */
-#view-screen-note{transition:opacity 1100ms ease, visibility 0s}
+  transition:opacity var(--dur-fade-photo) ease, transform 1400ms ease, visibility 0s linear var(--dur-fade-photo)}  /* 前置き中は完全に伏せる */
+#view-screen-note{transition:opacity var(--dur-fade) ease, visibility 0s}
 #view-screen-note.pending{opacity:0;visibility:hidden;
-  transition:opacity 1100ms ease, visibility 0s linear 1100ms}
+  transition:opacity var(--dur-fade) ease, visibility 0s linear var(--dur-fade)}
 #view-screen-note.fading{opacity:0;transition:opacity 1400ms ease}  /* 離脱時、写真と同じ間合いでフェードアウト */
 
 /* 投稿完了画面: 遷移が落ち着いてから本文をフェードイン */
@@ -653,6 +654,15 @@ let heldTotalSec = 0;
 let currentPostId = null;
 let introTimers = [];
 
+function imageLoads(url){
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => resolve(true);
+    img.onerror = () => resolve(false);
+    img.src = url;
+  });
+}
+
 async function openView(origin){
   viewOrigin = origin;
 
@@ -672,7 +682,9 @@ async function openView(origin){
 
   const drift = await getRandomDrift();
 
-  if (!drift){
+  if (!drift || !(await imageLoads(drift.image_url))){
+    /* drift.image_url がストレージから削除済み等で読み込めない場合も、
+       候補0件のときと同じ扱いにして「黒画像」を見せない */
     whisper("まだ写真が届いていません。あなたが最初の一人になりませんか？", 5000);
     setTimeout(() => {
       if (viewOrigin === "done") backToDone();
@@ -687,11 +699,11 @@ async function openView(origin){
 
   introTimers.forEach(clearTimeout); introTimers = [];
   introTimers.push(setTimeout(() => intro.classList.add("show"), 1250));
-  introTimers.push(setTimeout(() => intro.classList.remove("show"), 2800));
+  introTimers.push(setTimeout(() => intro.classList.remove("show"), 3300));
   introTimers.push(setTimeout(() => {
     stage.classList.remove("pending");
     snote.classList.remove("pending");
-  }, 3700));
+  }, 4200));
 }
 
 /* ---- 現像インタラクション ---- */
