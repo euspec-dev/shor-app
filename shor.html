@@ -35,6 +35,7 @@
   --warmth:226,164,118;        /* 体温の色（夕暮れの残光のような、落ち着いた温かい琥珀）RGB */
   --line:rgba(245,241,232,.28);
   --dur-fade:1100ms;
+  --dur-fade-photo:1600ms; /* 写真は前置きメッセージ等より体感速度が速く感じるため個別に長め */
 }
 
 *{margin:0;padding:0;box-sizing:border-box}
@@ -87,7 +88,9 @@ body{
 }
 
 /* ============ レイアウト ============ */
-#app{position:fixed;inset:0;display:grid;place-items:center;
+#app{position:fixed;top:0;left:0;right:0;
+  height:100vh;height:100dvh; /* dvh未対応ブラウザ向けにvhをフォールバックとして残す */
+  display:grid;place-items:center;
   padding:calc(58px + env(safe-area-inset-top)) 22px calc(60px + env(safe-area-inset-bottom));
 }
 .screen{
@@ -159,14 +162,14 @@ footer a{color:inherit;text-decoration:none;border-bottom:1px solid rgba(207,201
 
 /* 閲覧前の前置き演出: メッセージを見せてからポラロイドへ */
 .view-intro{position:absolute;top:50%;left:0;right:0;transform:translateY(-50%);
-  opacity:0;transition:opacity 1100ms ease;pointer-events:none}
+  opacity:0;transition:opacity var(--dur-fade) ease;pointer-events:none}
 .view-intro.show{opacity:1}
-.view-stage{transition:opacity 1100ms ease, transform 1400ms ease, visibility 0s}
+.view-stage{transition:opacity var(--dur-fade-photo) ease, transform 1400ms ease, visibility 0s}
 .view-stage.pending{opacity:0;pointer-events:none;visibility:hidden;
-  transition:opacity 1100ms ease, transform 1400ms ease, visibility 0s linear 1100ms}  /* 前置き中は完全に伏せる */
-#view-screen-note{transition:opacity 1100ms ease, visibility 0s}
+  transition:opacity var(--dur-fade-photo) ease, transform 1400ms ease, visibility 0s linear var(--dur-fade-photo)}  /* 前置き中は完全に伏せる */
+#view-screen-note{transition:opacity var(--dur-fade) ease, visibility 0s}
 #view-screen-note.pending{opacity:0;visibility:hidden;
-  transition:opacity 1100ms ease, visibility 0s linear 1100ms}
+  transition:opacity var(--dur-fade) ease, visibility 0s linear var(--dur-fade)}
 #view-screen-note.fading{opacity:0;transition:opacity 1400ms ease}  /* 離脱時、写真と同じ間合いでフェードアウト */
 
 /* 投稿完了画面: 遷移が落ち着いてから本文をフェードイン */
@@ -245,7 +248,21 @@ footer a{color:inherit;text-decoration:none;border-bottom:1px solid rgba(207,201
   color:rgba(245,241,232,.6);font-size:11px;font-weight:400;letter-spacing:.32em;text-indent:.32em;
   transition:opacity 500ms ease;background:transparent;border:none;
 }
-.pick.hidden{opacity:0;pointer-events:none}
+/* 写真決定後も選び直せるよう、右下に丸い撮り直しボタンだけ残す */
+.pick.picked{inset:auto;right:10px;bottom:10px;left:auto;top:auto;
+  width:36px;height:36px;padding:0;font-size:0;letter-spacing:0;text-indent:0;
+  border-radius:50%;background:rgba(20,20,18,.4);
+  border:1px solid rgba(245,241,232,.35);color:rgba(245,241,232,.65)}
+.pick.picked svg{width:16px;height:16px;display:block}
+/* 投稿できない写真を選んだ際のお知らせ。「＋ 写真を選ぶ」はそのまま残し、
+   その下に重ねる。フェードの出し方は#whisperを踏襲しつつ、durationは長めに */
+.photo-note{position:absolute;left:0;right:0;top:calc(50% + 22px);
+  padding:0 16px;text-align:center;
+  font-size:10px;font-weight:300;letter-spacing:.18em;line-height:1.9;
+  color:var(--ink-mist);opacity:0;pointer-events:none;
+  transition:opacity 1400ms ease;
+  text-shadow:0 1px 12px rgba(20,22,26,.6)}
+.photo-note.show{opacity:1}
 .pick:focus-visible{outline:1px dashed rgba(245,241,232,.5);outline-offset:-8px}
 .send-btn{
   appearance:none;width:100%;background:transparent;font:inherit;cursor:pointer;
@@ -363,6 +380,7 @@ footer a{color:inherit;text-decoration:none;border-bottom:1px solid rgba(207,201
       <div class="photo">
         <div class="post-img" id="post-pic"></div>
         <button class="pick" id="btn-pick" type="button">＋ 写真を選ぶ</button>
+        <div class="photo-note" id="photo-note"></div>
         <input type="file" id="file-input" accept="image/*" hidden>
       </div>
       <div class="skirt">
@@ -385,7 +403,7 @@ footer a{color:inherit;text-decoration:none;border-bottom:1px solid rgba(207,201
         <button class="to-top" id="done-to-top" type="button" style="margin-top:1.8em;padding-top:0">TOPへ戻る</button>
       </div>
       <div class="done-foot">
-        <p class="small">現在はプロトタイプとしてひっそりと開かれています。<br>もし気に入っていただけたなら、<br>ホーム画面に追加して応援してください。</p>
+        <p class="small" id="pwa-note">現在はプロトタイプとしてひっそりと開かれています。<br>もし気に入っていただけたなら、<br>ホーム画面に追加して応援してください。</p>
         <button class="btn done-pwa" id="btn-pwa">ホーム画面に追加する</button>
       </div>
     </div>
@@ -653,6 +671,15 @@ let heldTotalSec = 0;
 let currentPostId = null;
 let introTimers = [];
 
+function imageLoads(url){
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => resolve(true);
+    img.onerror = () => resolve(false);
+    img.src = url;
+  });
+}
+
 async function openView(origin){
   viewOrigin = origin;
 
@@ -672,7 +699,9 @@ async function openView(origin){
 
   const drift = await getRandomDrift();
 
-  if (!drift){
+  if (!drift || !(await imageLoads(drift.image_url))){
+    /* drift.image_url がストレージから削除済み等で読み込めない場合も、
+       候補0件のときと同じ扱いにして「黒画像」を見せない */
     whisper("まだ写真が届いていません。あなたが最初の一人になりませんか？", 5000);
     setTimeout(() => {
       if (viewOrigin === "done") backToDone();
@@ -687,11 +716,11 @@ async function openView(origin){
 
   introTimers.forEach(clearTimeout); introTimers = [];
   introTimers.push(setTimeout(() => intro.classList.add("show"), 1250));
-  introTimers.push(setTimeout(() => intro.classList.remove("show"), 2800));
+  introTimers.push(setTimeout(() => intro.classList.remove("show"), 3300));
   introTimers.push(setTimeout(() => {
     stage.classList.remove("pending");
     snote.classList.remove("pending");
-  }, 3700));
+  }, 4200));
 }
 
 /* ---- 現像インタラクション ---- */
@@ -773,7 +802,7 @@ function release(){
       snote.classList.add("pending");
       void snote.offsetWidth;
       snote.style.transition = "";
-      if (viewOrigin === "done") backToDone();
+      if (viewOrigin === "done") renderHome();
       else openPost();
     }, 1500);
   } else {
@@ -792,8 +821,21 @@ zone.addEventListener("pointercancel", release);
    ============================================================ */
 const capInput = $("cap-input"), capCounter = $("cap-counter"),
       btnSend = $("btn-send"), btnPick = $("btn-pick"),
-      fileInput = $("file-input"), postPic = $("post-pic");
+      fileInput = $("file-input"), postPic = $("post-pic"), photoNote = $("photo-note");
 let pickedDataUrl = null;
+/* 撮り直しボタン用のカメラアイコン（線画、他要素と揃えてstroke基調） */
+const CAMERA_ICON_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l1.5-2h7L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.5"/></svg>';
+const PICK_LABEL = "＋ 写真を選ぶ";
+let photoNoteTimer = null;
+/* whisper()は画面下部で視認性が低いため、写真エリア(黒い四角)に重ねて
+   伝える。フェードの出し方はwhisper()（#whisper.show）を踏襲しつつ、
+   durationは1400msに延ばしている（.photo-note参照） */
+function showPickError(text, ms = 3600){
+  clearTimeout(photoNoteTimer);
+  photoNote.textContent = text;
+  photoNote.classList.add("show");
+  photoNoteTimer = setTimeout(() => photoNote.classList.remove("show"), ms);
+}
 
 function openPost(){
   $("post-lead").hidden = false;
@@ -824,14 +866,16 @@ fileInput.addEventListener("change", async () => {
   fileInput.value = "";
   if (!file) return;
   const buf = await file.arrayBuffer();
-  if (!DEV_SKIP_EXIF && !hasCameraExif(buf)){
-    whisper("投稿できるのは、カメラで撮影された写真のみです。");
+  if (!DEV_SKIP_EXIF && !hasCameraExif(buf) && !isHeic(buf)){
+    showPickError("カメラで撮影した写真のみ選べます");
     return;
   }
   pickedDataUrl = await downscale(file, 1280);
   postPic.style.backgroundImage = `url("${pickedDataUrl}")`;
   postPic.classList.add("loaded");
-  btnPick.classList.add("hidden");
+  btnPick.classList.add("picked");
+  btnPick.setAttribute("aria-label", "写真を変更する");
+  btnPick.innerHTML = CAMERA_ICON_SVG;
   refreshPostUI();
 });
 
@@ -878,8 +922,11 @@ function resetPostForm(){
   capInput.value = ""; pickedDataUrl = null;
   postPic.style.backgroundImage = "none";
   postPic.classList.remove("loaded");
-  btnPick.classList.remove("hidden");
-  btnPick.textContent = "＋ 写真を選ぶ";
+  btnPick.classList.remove("picked");
+  btnPick.removeAttribute("aria-label");
+  btnPick.textContent = PICK_LABEL;
+  clearTimeout(photoNoteTimer);
+  photoNote.classList.remove("show");
   btnSend.textContent = "海に流す";
   refreshPostUI();
 }
@@ -912,6 +959,20 @@ function hasCameraExif(buffer){
       o += 2 + size;
     }
     return false;
+  }catch(e){ return false; }
+}
+
+/* iOSのカメラは既定でHEIC形式（JPEGではない）で撮影されるため、上のJPEG専用
+   EXIFパーサでは弾かれてしまう。HEIC/HEIFはスクリーンショット(PNG)やWeb上の
+   画像(JPEG/PNG/WebP)としてはまず流通しない実質カメラ専用形式なので、
+   EXIF解析はせず拡張子代わりのシグネチャ判定だけで許可する。 */
+function isHeic(buffer){
+  try{
+    if (buffer.byteLength < 12) return false;
+    const v = new DataView(buffer);
+    if (v.getUint32(4) !== 0x66747970) return false; /* "ftyp" */
+    const brand = String.fromCharCode(v.getUint8(8), v.getUint8(9), v.getUint8(10), v.getUint8(11));
+    return ["heic","heix","heim","heis","hevc","hevx","hevm","hevs","mif1","msf1"].includes(brand);
   }catch(e){ return false; }
 }
 
@@ -978,9 +1039,20 @@ function pwaFallbackMessage(){
   return "お使いのブラウザのメニューから<br>「ホーム画面に追加」または「アプリをインストール」を選んでください。";
 }
 
+/* whisper()は固定位置なので、コンテンツの多いscr-doneでは"ホーム画面に追加する"
+   ボタンと重なってしまう。既存の.small文言をその場で差し替えて案内する */
+const pwaNote = $("pwa-note");
+const PWA_NOTE_DEFAULT = pwaNote.innerHTML;
+let pwaNoteTimer = null;
+function showPwaNote(text, ms = 5200){
+  clearTimeout(pwaNoteTimer);
+  pwaNote.innerHTML = text;
+  pwaNoteTimer = setTimeout(() => { pwaNote.innerHTML = PWA_NOTE_DEFAULT; }, ms);
+}
+
 $("btn-pwa").addEventListener("click", async () => {
   if (deferredPrompt){ deferredPrompt.prompt(); await deferredPrompt.userChoice; deferredPrompt = null; }
-  else whisper(pwaFallbackMessage(), 5200);
+  else showPwaNote(pwaFallbackMessage(), 5200);
 });
 
 /* ============================================================
