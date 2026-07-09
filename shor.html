@@ -313,6 +313,14 @@ footer a{color:inherit;text-decoration:none;border-bottom:1px solid rgba(207,201
   border:none;cursor:pointer;font-size:18px;font-weight:300;line-height:1;
   color:var(--ink-charcoal-soft);padding:6px 8px}
 .modal-close:hover{color:var(--ink-charcoal)}
+/* 写真の追加元を選ぶモーダル（Androidのみ表示）。地色が明るいmodal-card内なので
+   通常の.btn（暗色背景向け）ではなく、charcoal系の落ち着いた線ボタンにする */
+.modal-actions{display:flex;flex-direction:column;gap:12px;margin-top:1.8em}
+.modal-actions .btn-choice{appearance:none;background:transparent;cursor:pointer;
+  border:1px solid rgba(61,58,53,.35);border-radius:2px;color:var(--ink-charcoal);
+  font:inherit;font-weight:400;font-size:11px;letter-spacing:.24em;text-indent:.24em;
+  padding:13px 10px;transition:background-color .5s ease}
+.modal-actions .btn-choice:hover{background:rgba(61,58,53,.06)}
 
 @media (prefers-reduced-motion:reduce){
   *{transition-duration:1ms !important;animation:none !important}
@@ -382,6 +390,7 @@ footer a{color:inherit;text-decoration:none;border-bottom:1px solid rgba(207,201
         <button class="pick" id="btn-pick" type="button">＋ 写真を選ぶ</button>
         <div class="photo-note" id="photo-note"></div>
         <input type="file" id="file-input" accept="image/*" hidden>
+        <input type="file" id="camera-input" accept="image/*" capture="environment" hidden>
       </div>
       <div class="skirt">
         <button class="send-btn" id="btn-send" type="button" disabled>海に流す</button>
@@ -426,6 +435,18 @@ footer a{color:inherit;text-decoration:none;border-bottom:1px solid rgba(207,201
   <div class="modal-card" role="dialog" aria-modal="true" aria-label="お知らせ">
     <button class="modal-close" id="notice-close" type="button" aria-label="閉じる">×</button>
     <p class="passage" id="notice-text"></p>
+  </div>
+</div>
+
+<!-- 写真の追加元を選ぶポップアップ（Androidのみ。iOSはOS標準シートに任せる） -->
+<div id="pick-choice-modal" class="modal" hidden>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-label="写真を追加">
+    <button class="modal-close" id="pick-choice-close" type="button" aria-label="閉じる">×</button>
+    <p class="quiet">写真を追加</p>
+    <div class="modal-actions">
+      <button class="btn-choice" id="btn-choice-camera" type="button">写真を撮る</button>
+      <button class="btn-choice" id="btn-choice-gallery" type="button">ギャラリーから選ぶ</button>
+    </div>
   </div>
 </div>
 
@@ -821,7 +842,8 @@ zone.addEventListener("pointercancel", release);
    ============================================================ */
 const capInput = $("cap-input"), capCounter = $("cap-counter"),
       btnSend = $("btn-send"), btnPick = $("btn-pick"),
-      fileInput = $("file-input"), postPic = $("post-pic"), photoNote = $("photo-note");
+      fileInput = $("file-input"), cameraInput = $("camera-input"),
+      postPic = $("post-pic"), photoNote = $("photo-note");
 let pickedDataUrl = null;
 /* 撮り直しボタン用のカメラアイコン（線画、他要素と揃えてstroke基調） */
 const CAMERA_ICON_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l1.5-2h7L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.5"/></svg>';
@@ -859,11 +881,33 @@ capInput.addEventListener("keydown", e => {
   if (e.key === "Enter"){ e.preventDefault(); capInput.blur(); }
 });
 
-btnPick.addEventListener("click", () => fileInput.click());
+/* iOSは<input type=file accept="image/*">タップだけでOS標準の
+   アクションシート（写真を撮る/ライブラリ/ファイル）が出るのでそのまま任せる。
+   Androidは同じinputだとPhoto Picker（カメラ選択肢が無い）に直行してしまう
+   端末があるため、自前の選択モーダルでカメラ用/ギャラリー用inputを出し分ける。
+   User-Agentでの簡易判定。 */
+function isAndroidUA(){ return /Android/i.test(navigator.userAgent); }
 
-fileInput.addEventListener("change", async () => {
-  const file = fileInput.files && fileInput.files[0];
-  fileInput.value = "";
+btnPick.addEventListener("click", () => {
+  if (isAndroidUA()) showModal("pick-choice-modal");
+  else fileInput.click();
+});
+$("btn-choice-camera").addEventListener("click", () => {
+  hideModal("pick-choice-modal");
+  cameraInput.click();
+});
+$("btn-choice-gallery").addEventListener("click", () => {
+  hideModal("pick-choice-modal");
+  fileInput.click();
+});
+$("pick-choice-close").addEventListener("click", () => hideModal("pick-choice-modal"));
+$("pick-choice-modal").addEventListener("click", e => {
+  if (e.target === $("pick-choice-modal")) hideModal("pick-choice-modal");
+});
+
+/* 「＋ 写真を選ぶ」（ギャラリー）と「写真を撮る」（カメラ、capture属性で直接
+   起動）の両方から同じ後処理を通す */
+async function handlePickedFile(file){
   if (!file) return;
   const buf = await file.arrayBuffer();
   if (!DEV_SKIP_EXIF && !hasCameraExif(buf) && !isHeic(buf)){
@@ -877,6 +921,17 @@ fileInput.addEventListener("change", async () => {
   btnPick.setAttribute("aria-label", "写真を変更する");
   btnPick.innerHTML = CAMERA_ICON_SVG;
   refreshPostUI();
+}
+
+fileInput.addEventListener("change", () => {
+  const file = fileInput.files && fileInput.files[0];
+  fileInput.value = "";
+  handlePickedFile(file);
+});
+cameraInput.addEventListener("change", () => {
+  const file = cameraInput.files && cameraInput.files[0];
+  cameraInput.value = "";
+  handlePickedFile(file);
 });
 
 btnSend.addEventListener("click", async () => {
