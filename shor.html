@@ -438,7 +438,8 @@ footer a{color:inherit;text-decoration:none;border-bottom:1px solid rgba(207,201
   </div>
 </div>
 
-<!-- 写真の追加元を選ぶポップアップ（Androidのみ。iOSはOS標準シートに任せる） -->
+<!-- 写真の追加元を選ぶポップアップ（iOS/Android共通。カメラ経由かどうかを
+     経路で判定するために、OSを問わずこのモーダルで出し分ける） -->
 <div id="pick-choice-modal" class="modal" hidden>
   <div class="modal-card" role="dialog" aria-modal="true" aria-label="写真を追加">
     <button class="modal-close" id="pick-choice-close" type="button" aria-label="閉じる">×</button>
@@ -882,16 +883,13 @@ capInput.addEventListener("keydown", e => {
 });
 
 /* iOSは<input type=file accept="image/*">タップだけでOS標準の
-   アクションシート（写真を撮る/ライブラリ/ファイル）が出るのでそのまま任せる。
-   Androidは同じinputだとPhoto Picker（カメラ選択肢が無い）に直行してしまう
-   端末があるため、自前の選択モーダルでカメラ用/ギャラリー用inputを出し分ける。
-   User-Agentでの簡易判定。 */
-function isAndroidUA(){ return /Android/i.test(navigator.userAgent); }
-
-btnPick.addEventListener("click", () => {
-  if (isAndroidUA()) showModal("pick-choice-modal");
-  else fileInput.click();
-});
+   アクションシート（写真を撮る/ライブラリ/ファイル）が出るが、Androidは
+   同じinputだとPhoto Picker（カメラ選択肢が無い）に直行してしまう端末がある。
+   さらに「カメラ写真かどうか」をEXIF/HEICの中身で判定するのはiOSのアプリ内
+   カメラ撮影でEXIFが欠落することがあり信頼できないため、経路（どちらの
+   inputから来たか）で判定する方式に統一する。そのためOSを問わず常に
+   自前の選択モーダルでカメラ用/ギャラリー用inputを出し分ける。 */
+btnPick.addEventListener("click", () => showModal("pick-choice-modal"));
 $("btn-choice-camera").addEventListener("click", () => {
   hideModal("pick-choice-modal");
   cameraInput.click();
@@ -905,14 +903,18 @@ $("pick-choice-modal").addEventListener("click", e => {
   if (e.target === $("pick-choice-modal")) hideModal("pick-choice-modal");
 });
 
-/* 「＋ 写真を選ぶ」（ギャラリー）と「写真を撮る」（カメラ、capture属性で直接
-   起動）の両方から同じ後処理を通す */
-async function handlePickedFile(file){
+/* fromCamera=true（cameraInput経由）は撮ったばかりの写真である以上、定義上
+   カメラ写真なのでEXIF/HEIC判定を丸ごとスキップする。fromCamera=false
+   （fileInput＝ギャラリー経由）のときだけ、スクショ・ダウンロード画像を
+   弾くために従来通りhasCameraExif/isHeicを通す */
+async function handlePickedFile(file, fromCamera){
   if (!file) return;
-  const buf = await file.arrayBuffer();
-  if (!DEV_SKIP_EXIF && !hasCameraExif(buf) && !isHeic(buf)){
-    showPickError("カメラで撮影した写真のみ選べます");
-    return;
+  if (!fromCamera && !DEV_SKIP_EXIF){
+    const buf = await file.arrayBuffer();
+    if (!hasCameraExif(buf) && !isHeic(buf)){
+      showPickError("カメラで撮影した写真のみ選べます");
+      return;
+    }
   }
   pickedDataUrl = await downscale(file, 1280);
   postPic.style.backgroundImage = `url("${pickedDataUrl}")`;
@@ -926,12 +928,12 @@ async function handlePickedFile(file){
 fileInput.addEventListener("change", () => {
   const file = fileInput.files && fileInput.files[0];
   fileInput.value = "";
-  handlePickedFile(file);
+  handlePickedFile(file, false);
 });
 cameraInput.addEventListener("change", () => {
   const file = cameraInput.files && cameraInput.files[0];
   cameraInput.value = "";
-  handlePickedFile(file);
+  handlePickedFile(file, true);
 });
 
 btnSend.addEventListener("click", async () => {
