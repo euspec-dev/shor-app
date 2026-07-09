@@ -122,6 +122,7 @@ h2.quiet{font-size:10px;letter-spacing:.55em;color:var(--ink-faint);
   border-radius:2px;transition:background-color .6s ease,color .6s ease,border-color .6s ease,opacity .6s ease;
 }
 .btn:hover{background:rgba(245,241,232,.07)}
+.btn:active{transform:scale(.97);transition:transform 120ms ease}
 .btn:focus-visible{outline:1px solid var(--ink-mist);outline-offset:3px}
 .btn:disabled{opacity:.3;cursor:default;background:transparent}
 .btn.ghost{border-color:transparent;color:var(--ink-faint);font-size:10px;font-weight:300;padding:10px 24px}
@@ -150,6 +151,7 @@ footer a{color:inherit;text-decoration:none;border-bottom:1px solid rgba(207,201
   border:1px solid rgba(0,0,0,.06);border-radius:2px;
   padding:18px 18px 0;
   color:var(--ink-charcoal);
+  box-shadow:0 1px 2px rgba(45,36,26,.06), 0 8px 24px rgba(45,36,26,.14);
   transition:opacity 1400ms ease, transform 1400ms ease;
 }
 .polaroid.washed{opacity:0;transform:translateY(26px) rotate(.6deg)} /* 波にさらわれる */
@@ -377,6 +379,7 @@ footer a{color:inherit;text-decoration:none;border-bottom:1px solid rgba(207,201
 .modal-card{position:relative;width:min(86vw,340px);
   background:var(--paper);color:var(--ink-charcoal);
   border-radius:3px;padding:38px 26px 32px;text-align:center;
+  box-shadow:0 4px 8px rgba(45,36,26,.08), 0 24px 48px rgba(45,36,26,.22);
   transform:translateY(8px);transition:transform 700ms ease}
 .modal.show .modal-card{transform:translateY(0)}
 .modal-card .quiet{color:var(--ink-charcoal-soft);margin-bottom:1.6em}
@@ -826,12 +829,12 @@ async function openView(origin){
 
   if (!drift || !(await imageLoads(drift.image_url))){
     /* drift.image_url がストレージから削除済み等で読み込めない場合も、
-       候補0件のときと同じ扱いにして「黒画像」を見せない */
-    whisper("まだ写真が届いていません。あなたが最初の一人になりませんか？", 5000);
-    setTimeout(() => {
-      if (viewOrigin === "done") backToDone();
-      else renderHome();
-    }, 1400);
+       候補0件のときと同じ扱いにして「黒画像」を見せない。
+       whisper()は画面下部固定のため、backToDone()で投稿完了画面に戻った
+       直後だとPWA案内(#pwa-note)と重なってしまう。先に画面遷移してから
+       モーダルで知らせることで、どの画面に戻っても重ならないようにする */
+    if (viewOrigin === "done") backToDone(); else renderHome();
+    openNotice("まだ写真が届いていません。<br>あなたが最初の一人になりませんか？");
     return;
   }
 
