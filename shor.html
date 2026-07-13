@@ -135,12 +135,18 @@ h2.quiet{font-size:10px;letter-spacing:.55em;color:var(--ink-faint);
 .done-actions .btn{margin-top:0;flex:1 1 0;min-width:0;
   padding:13px 10px;letter-spacing:.16em;text-indent:.16em;white-space:nowrap}
 
-/* 完了画面レイアウト: 本文＋2ボタンを画面中央、案内＋追加ボタンを下部に離す */
-#done-body{flex:1;width:100%;display:flex;flex-direction:column}
-.done-main{margin:auto 0;display:flex;flex-direction:column;align-items:center}
-.done-foot{padding-top:3.4em;display:flex;flex-direction:column;align-items:center}
+/* 完了画面レイアウト: 本文＋2ボタン＋案内＋追加ボタンをまとめて画面中央よりやや上に。
+   下部にpadding-bottomを確保し、フッター（プライバシーポリシー等、position:fixed）と
+   常に重ならないようにする */
+#done-body{flex:1;width:100%;display:flex;flex-direction:column;justify-content:center;padding-bottom:6.5em}
+.done-main{display:flex;flex-direction:column;align-items:center}
+.done-foot{padding-top:3.4em;display:flex;flex-direction:column;align-items:center;position:relative}
 .done-foot .small{margin-top:0}
 .btn.done-pwa{font-size:9.5px;padding:9px 22px;letter-spacing:.28em;text-indent:.28em;margin-top:1.6em}
+/* ボタン押下後の操作手順はabsolute配置にして、文言の有無が.done-foot自体の高さに
+   影響しないようにする（#done-bodyはjustify-content:centerなので、ここの高さが
+   変わるとボタン押下前の位置まで一緒にずれてしまうため） */
+#pwa-help{position:absolute;top:100%;left:0;right:0;margin-top:1.2em;text-align:center}
 
 /* ============ フッター ============ */
 footer{position:fixed;left:0;right:0;bottom:calc(10px + env(safe-area-inset-bottom));
@@ -289,7 +295,7 @@ footer a{color:inherit;text-decoration:none;border-bottom:1px solid rgba(207,201
 .dev-zone.pressing .heat{opacity:1}
 .dev-zone span{position:relative}
 
-.under-note{min-height:3.4em;margin-top:14px;font-size:10px;font-weight:300;letter-spacing:.16em;
+.under-note{min-height:3.9em;margin-top:14px;font-size:10px;font-weight:300;letter-spacing:.16em;
   line-height:1.9;color:var(--ink-charcoal-soft);opacity:0;transition:opacity 900ms ease}
 .under-note.show{opacity:1}
 
@@ -519,6 +525,7 @@ footer a{color:inherit;text-decoration:none;border-bottom:1px solid rgba(207,201
       <div class="done-foot">
         <p class="small" id="pwa-note">現在はプロトタイプとしてひっそりと開かれています。<br>もし気に入っていただけたなら、<br>ホーム画面に追加して応援してください。</p>
         <button class="btn done-pwa" id="btn-pwa">ホーム画面に追加する</button>
+        <p class="small" id="pwa-help"></p>
       </div>
     </div>
   </section>
@@ -1195,24 +1202,24 @@ window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); deferr
 function pwaFallbackMessage(){
   const ua = navigator.userAgent;
   const isIOS = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-  if (isIOS) return "Safari下部の共有ボタン（□に↑）をタップし、<br>「ホーム画面に追加」を選んでください。";
+  if (isIOS) return "共有ボタンをタップし、<br>「ホーム画面に追加」を選んでください。";
   return "お使いのブラウザのメニューから<br>「ホーム画面に追加」または「アプリをインストール」を選んでください。";
 }
 
 /* whisper()は固定位置なので、コンテンツの多いscr-doneでは"ホーム画面に追加する"
-   ボタンと重なってしまう。既存の.small文言をその場で差し替えて案内する */
-const pwaNote = $("pwa-note");
-const PWA_NOTE_DEFAULT = pwaNote.innerHTML;
-let pwaNoteTimer = null;
-function showPwaNote(text, ms = 5200){
-  clearTimeout(pwaNoteTimer);
-  pwaNote.innerHTML = text;
-  pwaNoteTimer = setTimeout(() => { pwaNote.innerHTML = PWA_NOTE_DEFAULT; }, ms);
+   ボタンと重なってしまう。押下時の操作手順はボタン上の説明文（#pwa-note、常に
+   同じ文言のまま）を差し替えるのではなく、ボタンの下の#pwa-helpに表示する */
+const pwaHelp = $("pwa-help");
+let pwaHelpTimer = null;
+function showPwaHelp(text, ms = 5200){
+  clearTimeout(pwaHelpTimer);
+  pwaHelp.innerHTML = text;
+  pwaHelpTimer = setTimeout(() => { pwaHelp.innerHTML = ""; }, ms);
 }
 
 $("btn-pwa").addEventListener("click", async () => {
   if (deferredPrompt){ deferredPrompt.prompt(); await deferredPrompt.userChoice; deferredPrompt = null; }
-  else showPwaNote(pwaFallbackMessage(), 5200);
+  else showPwaHelp(pwaFallbackMessage(), 5200);
 });
 
 /* ============================================================
