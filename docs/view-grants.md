@@ -25,7 +25,7 @@
 - `postGrants()` / `addPostGrant()` / `consumePostGrant()`
   （[shor.html:744-757](../shor.html#L744-L757)）
   `localStorage` の `shor:postGrants` に `{date, count, granted}` を保存する。
-  `addPostGrant()` は投稿成功時（[shor.html:1058](../shor.html#L1058)、
+  `addPostGrant()` は投稿成功時（[shor.html:1066](../shor.html#L1066)、
   `createPost` 成功直後）に呼ばれるが、その日すでに `granted:true` なら
   何もしない — **同じ日に何通投稿しても、投稿ボーナスは+1しか増えない。**
 - `canView()` （[shor.html:758](../shor.html#L758)）
@@ -99,8 +99,8 @@ UTC基準ではない。
 `canView() === false` のとき、押した場所によって2箇所で分岐する
 （どちらも同じ文言判定ロジック）。
 
-- ホーム画面「誰かの感性に触れる」（[shor.html:1256-1268](../shor.html#L1256-L1268)）
-- 投稿完了画面「誰かの感性に触れる」（[shor.html:1175-1181](../shor.html#L1175-L1181)）
+- ホーム画面「誰かの感性に触れる」（[shor.html:1229-1241](../shor.html#L1229-L1241)）
+- 投稿完了画面「誰かの感性に触れる」（[shor.html:1150-1156](../shor.html#L1150-L1156)）
 
 その日すでに投稿済み（`postGrants` が `granted:true`）かどうかで文言が変わる。
 

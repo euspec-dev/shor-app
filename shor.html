@@ -597,7 +597,7 @@ const DEVELOP_MS = 5000;
    ここでは物理削除（プライバシー要件、DISTRIBUTION_SPEC.md の STORAGE_TTL）のみ扱う。 */
 const STORAGE_EXPIRE_MS = 30 * 24 * 60 * 60 * 1000;
 
-const DEV_SKIP_EXIF = IS_DEV;
+const DEV_SKIP_PHOTO_CHECK = IS_DEV;
 
 const todayStr = () => {
   const d = new Date();
@@ -992,14 +992,21 @@ capInput.addEventListener("keydown", e => {
   if (e.key === "Enter"){ e.preventDefault(); capInput.blur(); }
 });
 
-/* iOSは<input type=file accept="image/*">タップだけでOS標準の
-   アクションシート（写真を撮る/ライブラリ/ファイル）が出るが、Androidは
-   同じinputだとPhoto Picker（カメラ選択肢が無い）に直行してしまう端末がある。
-   さらに「カメラ写真かどうか」をEXIF/HEICの中身で判定するのはiOSのアプリ内
-   カメラ撮影でEXIFが欠落することがあり信頼できないため、経路（どちらの
-   inputから来たか）で判定する方式に統一する。そのためOSを問わず常に
-   自前の選択モーダルでカメラ用/ギャラリー用inputを出し分ける。 */
-btnPick.addEventListener("click", () => showModal("pick-choice-modal"));
+function isIOS(){
+  return /iPhone|iPad|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+}
+
+/* iOSは<input type=file accept="image/*">タップだけでOS標準のアクション
+   シート（写真を撮る/ライブラリ/ファイル）が出るため、自前の選択モーダルを
+   挟むとタップが二重になる。iOSではモーダルを省略し、fileInputを直接開いて
+   OS標準シートに一本化する。Androidは同じinputだとPhoto Picker（カメラ
+   選択肢が無い）に直行してしまう端末があるため、従来通り自前モーダルで
+   カメラ用/ギャラリー用inputを出し分ける。 */
+btnPick.addEventListener("click", () => {
+  if (isIOS()) fileInput.click();
+  else showModal("pick-choice-modal");
+});
 $("btn-choice-camera").addEventListener("click", () => {
   hideModal("pick-choice-modal");
   cameraInput.click();
@@ -1013,16 +1020,17 @@ $("pick-choice-modal").addEventListener("click", e => {
   if (e.target === $("pick-choice-modal")) hideModal("pick-choice-modal");
 });
 
-/* fromCamera=true（cameraInput経由）は撮ったばかりの写真である以上、定義上
-   カメラ写真なのでEXIF/HEIC判定を丸ごとスキップする。fromCamera=false
-   （fileInput＝ギャラリー経由）のときだけ、スクショ・ダウンロード画像を
-   弾くために従来通りhasCameraExif/isHeicを通す */
+/* fromCamera=true（cameraInput経由、Androidの自前モーダルからのみ）は
+   撮ったばかりの写真である以上、定義上カメラ写真なので中身の判定を丸ごと
+   スキップする。fromCamera=false（iOSは常にこちら、Androidはギャラリー
+   経由）のときだけ、スクリーンショット（PNG形式で保存される）を中身の
+   シグネチャで弾く */
 async function handlePickedFile(file, fromCamera){
   if (!file) return;
-  if (!fromCamera && !DEV_SKIP_EXIF){
+  if (!fromCamera && !DEV_SKIP_PHOTO_CHECK){
     const buf = await file.arrayBuffer();
-    if (!hasCameraExif(buf) && !isHeic(buf)){
-      showPickError("カメラで撮影した写真のみ選べます");
+    if (isPng(buf)){
+      showPickError("スクリーンショットは選べません");
       return;
     }
   }
@@ -1098,48 +1106,15 @@ function resetPostForm(){
   refreshPostUI();
 }
 
-/* --- 最小JPEG EXIFパーサ --- */
-function hasCameraExif(buffer){
+/* スクリーンショットはOS標準でPNG形式で保存される。カメラ写真は基本的に
+   JPEGかHEICで、PNGとしては保存されない（EXIFのMake/Model有無に依存する
+   旧方式はiOSのアプリ内カメラ撮影でEXIFが欠落するケースがあり信頼できな
+   かったため、フォーマットのシグネチャだけで判定するこの方式に変更した） */
+function isPng(buffer){
   try{
+    if (buffer.byteLength < 8) return false;
     const v = new DataView(buffer);
-    if (v.getUint16(0) !== 0xFFD8) return false;
-    let o = 2;
-    while (o + 4 < v.byteLength){
-      if (v.getUint8(o) !== 0xFF) break;
-      const marker = v.getUint8(o + 1), size = v.getUint16(o + 2);
-      if (marker === 0xE1){
-        const base = o + 4;
-        if (v.getUint32(base) === 0x45786966){
-          const tiff = base + 6;
-          const little = v.getUint16(tiff) === 0x4949;
-          const u16 = p => v.getUint16(p, little), u32 = p => v.getUint32(p, little);
-          const ifd0 = tiff + u32(tiff + 4);
-          const n = u16(ifd0);
-          for (let i = 0; i < n; i++){
-            const tag = u16(ifd0 + 2 + i * 12);
-            if (tag === 0x010F || tag === 0x0110) return true;
-          }
-          return false;
-        }
-      }
-      if (marker === 0xDA) break;
-      o += 2 + size;
-    }
-    return false;
-  }catch(e){ return false; }
-}
-
-/* iOSのカメラは既定でHEIC形式（JPEGではない）で撮影されるため、上のJPEG専用
-   EXIFパーサでは弾かれてしまう。HEIC/HEIFはスクリーンショット(PNG)やWeb上の
-   画像(JPEG/PNG/WebP)としてはまず流通しない実質カメラ専用形式なので、
-   EXIF解析はせず拡張子代わりのシグネチャ判定だけで許可する。 */
-function isHeic(buffer){
-  try{
-    if (buffer.byteLength < 12) return false;
-    const v = new DataView(buffer);
-    if (v.getUint32(4) !== 0x66747970) return false; /* "ftyp" */
-    const brand = String.fromCharCode(v.getUint8(8), v.getUint8(9), v.getUint8(10), v.getUint8(11));
-    return ["heic","heix","heim","heis","hevc","hevx","hevm","hevs","mif1","msf1"].includes(brand);
+    return v.getUint32(0) === 0x89504E47 && v.getUint32(4) === 0x0D0A1A0A;
   }catch(e){ return false; }
 }
 
@@ -1200,9 +1175,7 @@ window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); deferr
 /* beforeinstallprompt に対応していないブラウザ（iOS/macOS Safari等）向けの案内。
    OSを判定して、実際に押す場所まで具体的に示す。 */
 function pwaFallbackMessage(){
-  const ua = navigator.userAgent;
-  const isIOS = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-  if (isIOS) return "共有ボタンをタップし、<br>「ホーム画面に追加」を選んでください。";
+  if (isIOS()) return "共有ボタンをタップし、<br>「ホーム画面に追加」を選んでください。";
   return "お使いのブラウザのメニューから<br>「ホーム画面に追加」または「アプリをインストール」を選んでください。";
 }
 
