@@ -12,7 +12,20 @@
 <meta property="og:image" content="https://euspec-dev.github.io/shor-app/icons/icon-512.png">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:image" content="https://euspec-dev.github.io/shor-app/icons/icon-512.png">
-<link rel="manifest" href="manifest.json">
+<link rel="manifest" href="manifest.json" id="app-manifest">
+<script>
+/* iOSは display:standalone でホーム画面に追加すると、Safari本体とは別の
+   隔離されたストレージ領域を持つ専用コンテナとして起動してしまい、同じ人が
+   Safariタブとホーム画面アイコンとで別々のshor:uidを持つ不具合につながる
+   （詳細はdocs/data-model.mdの「なぜiOSだけ別のmanifestを使うのか」参照）。
+   Androidのインストール可能判定（beforeinstallprompt）はdisplay:standalone
+   系を要求するため、全体をbrowserにはできない。そのためiOSだけ、ホーム画面に
+   追加される前に display:browser のmanifestへ差し替える。 */
+if (/iPhone|iPad|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)){
+  document.getElementById("app-manifest").href = "manifest-ios.json";
+}
+</script>
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
