@@ -4,6 +4,34 @@ Supabase (Postgres + Storage) 上の実体。認証は無く、匿名UUID
 （`localStorage`の`shor:uid`）がそのままユーザーIDとして使われる
 （[shor.html:612-613](../shor.html#L612-L613)）。
 
+### なぜiOSだけ別のmanifestを使うのか
+
+iOSでは、Web App Manifestで`display: standalone`（または`fullscreen`/
+`minimal-ui`）を指定したページを「ホーム画面に追加」すると、Safari本体とは
+別の隔離されたストレージ領域を持つ専用コンテナとして起動する。これは稀な
+不具合ではなく、iOSのPWA実装として毎回・確実に起きる仕様。`shor:uid`は
+`localStorage`にしか保存していないため、この隔離が起きると**同じ人物が
+Safariタブとホーム画面アイコンとで別々の`uid`を持つ**ことになり、
+「自分の投稿が他人の投稿として表示される」という、匿名の相手と交換する
+という本アプリの前提を壊す不具合につながる。
+
+一方、Androidの「インストール可能」判定（`beforeinstallprompt`が発火する
+条件）は`display`が`standalone`/`fullscreen`/`minimal-ui`のいずれかで
+あることを要求するため、`manifest.json`自体を`browser`にしてしまうと
+Android側のネイティブインストールダイアログが失われる。そのため
+**iOSだけ**、`display: browser`にした別ファイル`manifest-ios.json`を用意し、
+ページ読み込み時にUA判定でiOSなら`<link rel="manifest" id="app-manifest">`
+の参照先をそちらに差し替えている（[shor.html:15-27](../shor.html#L15-L27)）。
+「ホーム画面に追加」は常にユーザーの明示的な操作で、この差し替えは
+head内で同期的に（他のスクリプトより先に）実行されるため、追加操作の時点
+では確実に差し替え後のmanifestが参照される。
+
+この結果、iOSでの「ホーム画面に追加」はSafari本体の通常タブとして開くよう
+になり、ストレージが分離されなくなる（トレードオフとして、アドレスバー等
+Safari標準UIが表示され、フルスクリーンのネイティブアプリ風の見た目には
+ならない）。Androidは従来通り`manifest.json`（`display: standalone`）を
+使うため、ネイティブインストールダイアログは維持される。
+
 ## テーブル一覧
 
 ### users

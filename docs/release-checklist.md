@@ -59,16 +59,24 @@
 
 ## PWA（ホーム画面に追加）
 
-- [ ] `manifest.json` / `service-worker.js` / `icons/icon-192.png` /
-      `icons/icon-512.png` が本番URLで実際に開ける（404になっていない）
+- [ ] `manifest.json` / `manifest-ios.json` / `service-worker.js` /
+      `icons/icon-192.png` / `icons/icon-512.png` が本番URLで実際に開ける
+      （404になっていない）
 - [ ] Chrome/Edge/Android等で本番URLを開き、「ホーム画面に追加する」ボタンを
       押すと**ブラウザ標準のインストールダイアログ**が出る
       （出ない場合は`manifest.json`のパス・アイコンパスや、
       Service Workerの登録エラーがないか開発者ツールのConsoleで確認する）
-- [ ] iOS Safariで本番URLを開き、同ボタンを押すと「Safari下部の共有ボタン
-      （□に↑）をタップし、ホーム画面に追加を選んでください」という案内が出る
+- [ ] iOS Safariで本番URLを開き、同ボタンを押すと「共有ボタンをタップし、
+      ホーム画面に追加を選んでください」という案内が出る
       （iOS/iPadOS Safariは`beforeinstallprompt`に対応していないため、
       自動ダイアログではなく案内文が出るのが正しい挙動）
+- [ ] `manifest-ios.json`は`display: browser`になっており、`manifest.json`
+      （Android用、`display: standalone`）とは意図的に別内容にしてある
+- [ ] iOS SafariのDevToolsやUAスプーフィングで確認し、`<link id="app-manifest">`
+      の`href`が`manifest-ios.json`に差し替わっている（`standalone`のままだと
+      iOSでホーム画面アイコンがSafariと別のストレージ領域を持ってしまい、
+      同じ人が別人として扱われる不具合が起きる。詳細は
+      [data-model.md](data-model.md)の「なぜiOSだけ別のmanifestを使うのか」参照）
 
 ## 最終確認
 
