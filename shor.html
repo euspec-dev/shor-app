@@ -612,12 +612,17 @@ const STORAGE_EXPIRE_MS = 30 * 24 * 60 * 60 * 1000;
 
 const DEV_SKIP_PHOTO_CHECK = IS_DEV;
 
-const todayStr = () => {
-  const d = new Date();
+/* アプリ内の「1日」は深夜0時ではなく朝7時区切り（端末のローカル時刻基準）。
+   「現在時刻から7時間引いた時点の日付」をその日の文字列として扱うことで、
+   午前0時〜6時59分は前日として扱われる。 */
+const APP_DAY_SHIFT_MS = 7 * 60 * 60 * 1000;
+const appDayStr = () => {
+  const d = new Date(Date.now() - APP_DAY_SHIFT_MS);
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 };
-const yesterdayStr = () => {
-  const d = new Date(); d.setDate(d.getDate()-1);
+const appYesterdayStr = () => {
+  const d = new Date(Date.now() - APP_DAY_SHIFT_MS);
+  d.setDate(d.getDate()-1);
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 };
 
@@ -707,14 +712,15 @@ async function recordViewHistoryDB(postId, viewedSeconds){
 }
 
 async function getResultForDate(dateStr){
-  const yStart = new Date(dateStr + "T00:00:00").toISOString();
-  const yEnd   = new Date(dateStr + "T23:59:59").toISOString();
+  /* appDayStr()と同じ区切り（朝7時〜翌朝7時）で「その日」の投稿を集計する */
+  const yStart = new Date(dateStr + "T07:00:00");
+  const yEnd = new Date(yStart.getTime() + 24 * 60 * 60 * 1000);
 
   const { data: myPosts } = await db.from("posts")
     .select("id")
     .eq("author_id", userId)
-    .gte("created_at", yStart)
-    .lte("created_at", yEnd);
+    .gte("created_at", yStart.toISOString())
+    .lt("created_at", yEnd.toISOString());
 
   if (!myPosts || myPosts.length === 0) return null;
 
@@ -751,22 +757,22 @@ function show(id){
 /* ============================================================
    閲覧権モデル（1日でリセット）
    ============================================================ */
-function freeUsedToday(){ return store.get("viewFreeUsed", null) === todayStr(); }
-function useFreeGrant(){ store.set("viewFreeUsed", todayStr()); }
+function freeUsedToday(){ return store.get("viewFreeUsed", null) === appDayStr(); }
+function useFreeGrant(){ store.set("viewFreeUsed", appDayStr()); }
 
 function postGrants(){
   const g = store.get("postGrants", null);
-  return (g && g.date === todayStr()) ? (g.count || 0) : 0;
+  return (g && g.date === appDayStr()) ? (g.count || 0) : 0;
 }
 function addPostGrant(){
   const g = store.get("postGrants", null);
-  if (g && g.date === todayStr() && g.granted) return;
-  store.set("postGrants", { date: todayStr(), count: postGrants() + 1, granted: true });
+  if (g && g.date === appDayStr() && g.granted) return;
+  store.set("postGrants", { date: appDayStr(), count: postGrants() + 1, granted: true });
 }
 function consumePostGrant(){
   const g = store.get("postGrants", null);
-  const grantedToday = g && g.date === todayStr() && g.granted;
-  store.set("postGrants", { date: todayStr(), count: Math.max(0, postGrants() - 1), granted: grantedToday });
+  const grantedToday = g && g.date === appDayStr() && g.granted;
+  store.set("postGrants", { date: appDayStr(), count: Math.max(0, postGrants() - 1), granted: grantedToday });
 }
 function canView(){ return !freeUsedToday() || postGrants() > 0; }
 function consumeView(){
@@ -787,7 +793,7 @@ async function renderHome(){
   pendingResult = null;
   const lastPostDate = store.get("lastPostDate", null);
 
-  if (lastPostDate && lastPostDate < todayStr()){
+  if (lastPostDate && lastPostDate < appDayStr()){
     const confirmKey = "resultConfirmed:" + lastPostDate;
     if (!store.get(confirmKey, false)){
       const seconds = await getResultForDate(lastPostDate);
@@ -1075,7 +1081,7 @@ btnSend.addEventListener("click", async () => {
   try {
     const imageUrl = await uploadPhoto(pickedDataUrl);
     await createPost(imageUrl, capInput.value);
-    store.set("lastPostDate", todayStr());
+    store.set("lastPostDate", appDayStr());
     addPostGrant();
 
     $("post-polaroid").classList.add("washed");
@@ -1162,7 +1168,7 @@ function backToDone(){
 
 $("btn-give2see").addEventListener("click", () => {
   if (!canView()){
-    openNotice("未開封のボトルメールは以上です。<br>また明日、のぞきに来てください。");
+    openNotice("未開封のボトルメールは以上です。<br>朝7時に、次の一通が流れ着きます。");
     return;
   }
   openView("done");
@@ -1242,9 +1248,9 @@ $("notice-modal").addEventListener("click", e => {
 $("btn-see").addEventListener("click", () => withResultGate(() => {
   if (!canView()){
     const g = store.get("postGrants", null);
-    const postedToday = g && g.date === todayStr() && g.granted;
+    const postedToday = g && g.date === appDayStr() && g.granted;
     if (postedToday){
-      openNotice("未開封のボトルメールは以上です。<br>また明日、のぞきに来てください。");
+      openNotice("未開封のボトルメールは以上です。<br>朝7時に、次の一通が流れ着きます。");
     } else {
       openNotice("ボトルメールは1日1通だけ届きます。<br>自分のボトルメールを海に流すと、<br>追加で1通だけ届きます。");
     }
@@ -1256,8 +1262,8 @@ $("btn-see").addEventListener("click", () => withResultGate(() => {
 /* ===== 開発テスト用（IS_DEVでのみ有効。本番configでは devbar 自体を除去する） ===== */
 if (IS_DEV){
   $("dev-yesterday").addEventListener("click", () => {
-    store.set("lastPostDate", yesterdayStr());
-    store.set("resultConfirmed:" + yesterdayStr(), false);
+    store.set("lastPostDate", appYesterdayStr());
+    store.set("resultConfirmed:" + appYesterdayStr(), false);
     location.reload();
   });
   $("dev-reset").addEventListener("click", () => {
@@ -1272,9 +1278,10 @@ if (IS_DEV){
       whisper("まだ投稿がありません。先に「海に流す」を試してください。");
       return;
     }
-    const yStr = yesterdayStr();
-    const yStart = new Date(lastDate + "T00:00:00").toISOString();
-    /* Supabaseの投稿のcreated_atも昨日に書き換え、日付クエリが一致するようにする */
+    const yStr = appYesterdayStr();
+    const yStart = new Date(lastDate + "T07:00:00").toISOString();
+    /* Supabaseの投稿のcreated_atも前日（アプリ内の1日区切り基準）に書き換え、
+       日付クエリが一致するようにする */
     await db.from("posts")
       .update({ created_at: new Date(yStr + "T12:00:00").toISOString() })
       .eq("author_id", userId)
