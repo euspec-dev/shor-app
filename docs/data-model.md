@@ -32,6 +32,32 @@ Safari標準UIが表示され、フルスクリーンのネイティブアプリ
 ならない）。Androidは従来通り`manifest.json`（`display: standalone`）を
 使うため、ネイティブインストールダイアログは維持される。
 
+## 投稿結果表示用のローカルストレージ（shor:myPosts）
+
+「あなたの感性のゆくえ」結果モーダル（[screens.md](screens.md)参照）は
+投稿1件ごとにサムネイル付きで表示するため、投稿成功時に`localStorage`の
+`shor:myPosts`へ自分の投稿を記録している。サーバ側に「これは自分の投稿の
+一覧」という専用テーブルは無く、あくまでクライアント側の表示専用データ。
+
+- 保存形式: `{id, createdAt, thumb}`の配列。`id`は`posts.id`、`createdAt`は
+  `Date.now()`（ミリ秒epoch）、`thumb`は長辺240px・JPEG品質0.5の
+  サムネイルdataURL
+- 書き込み: `btnSend`のクリックハンドラ内、`createPost()`成功直後
+  （[shor.html:1133-1138](../shor.html#L1133-L1138)）。サムネイルは
+  `makeThumb(pickedDataUrl, 240, .5)`（[shor.html:1212-1224](../shor.html#L1212-L1224)）
+  で生成する。`downscale()`（写真投稿本体のアップロード用）とは別の
+  軽量版で、既にJPEG化済みのdataURLを再度縮小するだけなのでFile/Blobを
+  経由しない
+- 掃除: `pruneMyPostThumbs()`（[shor.html:688-692](../shor.html#L688-L692)）が
+  起動時に`STORAGE_EXPIRE_MS`（30日）より古いエントリを削除する。
+  `cleanupOldPosts()`（サーバ側の投稿本体の掃除）とは別関数だが、
+  同じ期限・同じタイミング（起動時）で走らせている
+- 読み出し: `renderHome()`が起動の度に`shor:myPosts`を読み、まだ結果を
+  見せていない前日以前の投稿について`getResultForPost(postId)`
+  （[shor.html:750-756](../shor.html#L750-L756)）で`view_history`の
+  `viewed_seconds`合計を取得する。詳細は[screens.md](screens.md)の
+  「結果モーダル」節を参照
+
 ## テーブル一覧
 
 ### users
