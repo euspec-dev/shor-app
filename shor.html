@@ -406,6 +406,8 @@ footer a{color:inherit;text-decoration:none;border-bottom:1px solid rgba(207,201
 .modal-card .quiet{color:var(--ink-charcoal-soft);margin-bottom:1.6em}
 .modal-card .passage{color:var(--ink-charcoal)}
 .modal-card .passage.em{color:var(--ink-charcoal);margin-top:1.4em}
+.result-thumb{width:72px;height:72px;margin:1.6em auto 0;background-size:cover;
+  background-position:center;border:1px solid rgba(61,58,53,.35);border-radius:2px}
 .modal-close{position:absolute;top:8px;right:10px;appearance:none;background:transparent;
   border:none;cursor:pointer;font-size:18px;font-weight:300;line-height:1;
   color:var(--ink-charcoal-soft);padding:6px 8px}
@@ -551,6 +553,7 @@ footer a{color:inherit;text-decoration:none;border-bottom:1px solid rgba(207,201
     <button class="modal-close" id="result-close" type="button" aria-label="閉じる">×</button>
     <h2 class="quiet">あなたの感性のゆくえ</h2>
     <p class="passage">昨日のあなたの感性は、<br>見知らぬ誰かのもとへ<br>流れ着きました。</p>
+    <div class="result-thumb" id="result-thumb" hidden></div>
     <p class="passage em"><span id="result-sec" style="font-size:1.35em">--</span> 秒間、<br>誰かの感性と深く響き合いました。</p>
   </div>
 </div>
@@ -616,8 +619,8 @@ const DEV_SKIP_PHOTO_CHECK = IS_DEV;
    「現在時刻から7時間引いた時点の日付」をその日の文字列として扱うことで、
    午前0時〜6時59分は前日として扱われる。 */
 const APP_DAY_SHIFT_MS = 7 * 60 * 60 * 1000;
-const appDayStr = () => {
-  const d = new Date(Date.now() - APP_DAY_SHIFT_MS);
+const appDayStr = (ms = Date.now()) => {
+  const d = new Date(ms - APP_DAY_SHIFT_MS);
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 };
 const appYesterdayStr = () => {
@@ -681,6 +684,13 @@ async function cleanupOldPosts(){
   await db.from("posts").delete().in("id", ids);
 }
 
+/* shor:myPosts（結果表示用のサムネイル保存先）も同じ期限で掃除する */
+function pruneMyPostThumbs(){
+  const cutoff = Date.now() - STORAGE_EXPIRE_MS;
+  const myPosts = store.get("myPosts", []).filter(p => p.createdAt >= cutoff);
+  store.set("myPosts", myPosts);
+}
+
 async function uploadPhoto(dataUrl){
   const res = await fetch(dataUrl);
   const blob = await res.blob();
@@ -694,12 +704,13 @@ async function uploadPhoto(dataUrl){
 }
 
 async function createPost(imageUrl, message){
-  const { error } = await db.from("posts").insert({
+  const { data, error } = await db.from("posts").insert({
     author_id: userId,
     image_url: imageUrl,
     message: message
-  });
+  }).select("id").single();
   if (error) throw error;
+  return data.id;
 }
 
 async function recordViewHistoryDB(postId, viewedSeconds){
@@ -729,6 +740,17 @@ async function getResultForDate(dateStr){
     .select("viewed_seconds")
     .in("post_id", postIds);
 
+  if (!views || views.length === 0) return 0;
+  return Math.round(views.reduce((sum, v) => sum + v.viewed_seconds, 0));
+}
+
+/* 投稿1件単位の結果。同日に複数投稿してもそれぞれ個別に集計できる
+   （getResultForDate()は日付単位の合算なので、こちらが投稿単位の後継）。
+   誰にも見られていなければ0を返す（＝投稿は実在するので必ず結果を出す）。 */
+async function getResultForPost(postId){
+  const { data: views } = await db.from("view_history")
+    .select("viewed_seconds")
+    .eq("post_id", postId);
   if (!views || views.length === 0) return 0;
   return Math.round(views.reduce((sum, v) => sum + v.viewed_seconds, 0));
 }
@@ -783,37 +805,66 @@ function consumeView(){
 /* ============================================================
    画面1: ダッシュボード
    ============================================================ */
-let pendingResult = null;
+let pendingResults = [];
 let afterResultAction = null;
 
 async function renderHome(){
   $("home-a").hidden = false;
   show("scr-home");
 
-  pendingResult = null;
-  const lastPostDate = store.get("lastPostDate", null);
+  pendingResults = [];
+  const today = appDayStr();
 
-  if (lastPostDate && lastPostDate < appDayStr()){
+  /* この機能を入れる前からの保留分（投稿単位のサムネイルを持たない）だけ、
+     後方互換として日付単位のまま拾う。サムネイルは無いので秒数のみ表示。
+     必ず投稿単位の結果より古いデータなので、先に並べる。 */
+  const lastPostDate = store.get("lastPostDate", null);
+  if (lastPostDate && lastPostDate < today){
     const confirmKey = "resultConfirmed:" + lastPostDate;
     if (!store.get(confirmKey, false)){
       const seconds = await getResultForDate(lastPostDate);
-      if (seconds !== null) pendingResult = { date: lastPostDate, seconds };
+      if (seconds !== null) pendingResults.push({ postId: null, seconds, thumb: null, legacyDateKey: confirmKey });
     }
+  }
+
+  /* 投稿1件ごとの結果（サムネイル付き）。前日以前に投稿したもののうち、
+     まだ結果を見せていないものを古い順に集める */
+  const myPosts = store.get("myPosts", []);
+  for (const p of myPosts){
+    if (appDayStr(p.createdAt) >= today) continue;
+    const key = "resultConfirmed:post:" + p.id;
+    if (store.get(key, false)) continue;
+    const seconds = await getResultForPost(p.id);
+    pendingResults.push({ postId: p.id, seconds, thumb: p.thumb || null });
   }
 }
 
-/* 保留中の前日結果があればモーダルを先に見せ、閉じてから本来の遷移を行う */
+/* 保留中の結果があればモーダルを先に見せ、閉じてから本来の遷移を行う。
+   複数件ある場合はモーダルを閉じるたびに次の1件を表示し、無くなってから
+   本来のアクションに進む（closeResultModal()参照）。 */
 function withResultGate(action){
-  if (pendingResult){
-    const { date, seconds } = pendingResult;
-    pendingResult = null;
-    store.set("resultConfirmed:" + date, true);
-    $("result-sec").textContent = seconds;
+  if (pendingResults.length){
     afterResultAction = action;
-    openResultModal();
+    showNextResult();
   } else {
     action();
   }
+}
+
+function showNextResult(){
+  const r = pendingResults.shift();
+  if (r.postId) store.set("resultConfirmed:post:" + r.postId, true);
+  else if (r.legacyDateKey) store.set(r.legacyDateKey, true);
+  $("result-sec").textContent = r.seconds;
+  const thumbEl = $("result-thumb");
+  if (r.thumb){
+    thumbEl.style.backgroundImage = `url("${r.thumb}")`;
+    thumbEl.hidden = false;
+  } else {
+    thumbEl.style.backgroundImage = "";
+    thumbEl.hidden = true;
+  }
+  openResultModal();
 }
 
 /* ============================================================
@@ -1080,8 +1131,11 @@ btnSend.addEventListener("click", async () => {
 
   try {
     const imageUrl = await uploadPhoto(pickedDataUrl);
-    await createPost(imageUrl, capInput.value);
-    store.set("lastPostDate", appDayStr());
+    const postId = await createPost(imageUrl, capInput.value);
+    const thumb = await makeThumb(pickedDataUrl, 240, .5).catch(() => null);
+    const myPosts = store.get("myPosts", []);
+    myPosts.push({ id: postId, createdAt: Date.now(), thumb });
+    store.set("myPosts", myPosts);
     addPostGrant();
 
     $("post-polaroid").classList.add("washed");
@@ -1150,6 +1204,22 @@ function downscale(file, max){
       res(c.toDataURL("image/jpeg", .82));
     };
     img.src = url;
+  });
+}
+
+/* 結果モーダル用の小さいサムネイル。既にJPEG化済みのdataURLを再度縮小するだけ
+   なのでFile/Blobを経由しない（downscale()とは入力が違う） */
+function makeThumb(dataUrl, max, quality){
+  return new Promise(res => {
+    const img = new Image();
+    img.onload = () => {
+      const r = Math.min(1, max / Math.max(img.width, img.height));
+      const c = document.createElement("canvas");
+      c.width = Math.round(img.width * r); c.height = Math.round(img.height * r);
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      res(c.toDataURL("image/jpeg", quality));
+    };
+    img.src = dataUrl;
   });
 }
 
@@ -1227,7 +1297,9 @@ function hideModal(id){
 function openResultModal(){ showModal("result-modal"); }
 function closeResultModal(){
   hideModal("result-modal");
-  if (afterResultAction){
+  if (pendingResults.length){
+    setTimeout(showNextResult, 700);
+  } else if (afterResultAction){
     const action = afterResultAction;
     afterResultAction = null;
     setTimeout(action, 700);
@@ -1273,20 +1345,24 @@ if (IS_DEV){
     location.reload();
   });
   $("dev-skip").addEventListener("click", async () => {
-    const lastDate = store.get("lastPostDate", null);
-    if (!lastDate){
+    const myPosts = store.get("myPosts", []);
+    if (!myPosts.length){
       whisper("まだ投稿がありません。先に「海に流す」を試してください。");
       return;
     }
-    const yStr = appYesterdayStr();
-    const yStart = new Date(lastDate + "T07:00:00").toISOString();
-    /* Supabaseの投稿のcreated_atも前日（アプリ内の1日区切り基準）に書き換え、
-       日付クエリが一致するようにする */
-    await db.from("posts")
-      .update({ created_at: new Date(yStr + "T12:00:00").toISOString() })
-      .eq("author_id", userId)
-      .gte("created_at", yStart);
-    store.set("lastPostDate", yStr);
+    /* 最新の投稿と同じアプリ内日の投稿をまとめて24時間（＝ちょうど1アプリ内日）
+       前へずらす。同日に複数投稿していても一度で「翌日」の状態を再現できる。
+       Supabase側のcreated_atも合わせて書き換える。 */
+    const latestDay = appDayStr(myPosts[myPosts.length - 1].createdAt);
+    const targets = myPosts.filter(p => appDayStr(p.createdAt) === latestDay);
+    for (const p of targets){
+      const newCreatedAt = p.createdAt - 24 * 60 * 60 * 1000;
+      await db.from("posts")
+        .update({ created_at: new Date(newCreatedAt).toISOString() })
+        .eq("id", p.id);
+      p.createdAt = newCreatedAt;
+    }
+    store.set("myPosts", myPosts);
     location.reload();
   });
 } else {
@@ -1298,6 +1374,7 @@ $("link-contact").addEventListener("click", e => { e.preventDefault(); whisper("
 
 initUser().catch(console.error);
 cleanupOldPosts().catch(console.error);
+pruneMyPostThumbs();
 renderHome();
 })();
 </script>
