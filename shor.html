@@ -172,13 +172,18 @@ footer a{color:inherit;text-decoration:none;border-bottom:1px solid rgba(207,201
   border:1px solid rgba(0,0,0,.06);border-radius:2px;
   padding:18px 18px 0;
   color:var(--ink-charcoal);
-  box-shadow:0 1px 2px rgba(45,36,26,.06), 0 8px 24px rgba(45,36,26,.14);
+  position:relative;
+  z-index:0; /* ::beforeの負のz-indexをこの要素内に閉じ込めて新しいスタッキング
+                コンテキストを作る（無いとカード外の兄弟要素の背後に回り込む） */
+  box-shadow:0 1px 2px rgba(45,36,26,.06), 0 8px 24px rgba(45,36,26,.14),
+    inset 0 1px 0 rgba(255,255,255,.5), inset 0 -1px 0 rgba(45,36,26,.06);
   transition:opacity 1400ms ease, transform 1400ms ease;
 }
-.polaroid.washed{opacity:0;transform:translateY(26px) rotate(.6deg)} /* 波にさらわれる */
-/* 投稿側のポラロイドは少し速く消し、完了画面を早めに見せる */
-#post-polaroid{transition:opacity 800ms ease, transform 800ms ease}
-
+.polaroid::before{ /* 印画紙の繊維感。#shore::afterと同じノイズ画像を極薄で重ねる */
+  content:"";position:absolute;inset:0;z-index:-1;
+  border-radius:inherit;pointer-events:none;opacity:.04;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+}
 /* 他人から届いた写真は、偶然流れ着いたように少し右へ傾ける。
    回転はclip-pathと同じ.polaroid-shadow（外側）側に付けている
    （#view-polaroid自身に付けるとclip-pathの矩形が回転に追従せず、
@@ -266,6 +271,124 @@ footer a{color:inherit;text-decoration:none;border-bottom:1px solid rgba(207,201
   .unroll-stage.play .polaroid-clip{clip-path:inset(0 0 0 0 round 2px)}
   .unroll-stage.play .roll-wrap,
   .unroll-stage.play .string{opacity:0}
+}
+
+/* ============ 送り出し演出: 投稿完了時、ポラロイドが巻かれてボトルへ ============
+   受け取り演出(.unroll-stage)と対になる、逆方向のロール。初期状態が逆
+   （常時全開⇔常時全閉）なので同じクラスは使わず別クラスにしてある。
+   円筒のグラデーション(.sendoff-tube)は受け取り演出の.roll-tubeと同じ値。
+   ひもを結ぶ工程は無い（.stringは受け取り演出専用のまま）。
+   巻かれるのはアニメ専用の複製ではなく、画面に表示されている#post-polaroid
+   （投稿カードそのもの）。.sendoff-shadow(影) > .sendoff-clip(clip)の
+   二重ラッパーで包み、.sendoff-roll(筒)は同じ.sendoff-stageを基準に
+   left/rightをカードと揃えて配置する（幅は自動的に一致する）。 */
+.sendoff-stage{position:relative;width:min(86vw,350px)}
+.sendoff-shadow{
+  filter:drop-shadow(0 14px 26px rgba(45,36,26,.38)) drop-shadow(0 2px 5px rgba(45,36,26,.22));
+  transform:translateZ(0); /* 受け取り演出側の.polaroid-shadowにはrotate(1.5deg)があり、
+    それが独立した合成レイヤーを作る副作用でfilterがclip-pathの毎フレームの変化に
+    正しく追従している。.sendoff-shadowにはtransformが無く、この差のせいでfilterが
+    古い(clip前の)形状のまま描画され続け、筒より下にカードの影が薄く残って見える
+    ことがあるため、見た目を変えない範囲でtransformを付けて同じレイヤー化を強制する */
+}
+.sendoff-clip{
+  overflow:hidden;border-radius:2px; /* 角丸はここ(静的)だけが担う。round付きclip-pathを
+    アニメーションさせるとブラウザによっては角丸矩形の再計算が毎フレーム
+    正しく行われず、筒より下にカードが薄く残って見えることがあるため、
+    アニメ対象のclip-pathからはroundを外し、角丸はoverflow:hiddenの
+    border-radiusに一本化してある */
+  clip-path:inset(0 0 0 0);
+  will-change:clip-path;
+}
+.sendoff-stage.play .sendoff-clip{
+  /* sendoffRollUpは筒の中心に境界を合わせるため13px分カードを残して終わる
+     （上のコメント参照）。筒自体はsendoffTubeFadeで2.7〜3.2sにフェード
+     アウトするため、その残り13pxを覆うものが無くなり、筒が消えた後に
+     カード上部の帯だけが浮いて見えてしまう。sendoffClipFinishを同じ
+     .5s ease 2.7sで重ね、筒が消え切るのと同時にカードも完全に閉じ切る */
+  animation:sendoffRollUp 2.2s cubic-bezier(.4,.1,.3,1) forwards,
+            sendoffClipFinish .5s ease 2.7s forwards;
+}
+/* WebKitはbackdrop-filterを持つ要素の背景ぼかし層を祖先のclip-pathで
+   切り取れないことがあり、本体が消えても磨りガラス層だけ筒の下に残って
+   見えることがあるため、演出中は明示的に無効化する */
+.sendoff-stage.play .polaroid{backdrop-filter:none;-webkit-backdrop-filter:none}
+.sendoff-roll{
+  position:absolute;left:2px;right:2px;top:calc(100% - 9px);height:9px;
+  filter:drop-shadow(0 6px 9px rgba(45,36,26,.35));opacity:0;
+}
+.sendoff-stage.play .sendoff-roll{
+  opacity:1;
+  animation:sendoffTubeUp 2.2s cubic-bezier(.4,.1,.3,1) forwards,
+            sendoffTubeFade .5s ease 2.7s forwards;
+}
+.sendoff-curl{
+  position:absolute;left:6px;right:6px;top:-11px;height:12px;
+  background:linear-gradient(180deg, rgba(60,48,34,0) 0%, rgba(60,48,34,.2) 100%);
+}
+.sendoff-tube{
+  position:absolute;inset:0;border-radius:999px;
+  background:linear-gradient(180deg,
+    #fffdf7 0%, #f7f1e2 14%, #e0d6bf 36%,
+    #b3a68a 58%, #9a8d72 70%, #cfc4aa 86%, #b6ab90 100%);
+}
+
+/* clip境界は「筒の中心」に一致させる（筒の上端ではない）。筒は上端基準
+   (top)で動くため、境界を単純に0→100%（高さゼロの線）で動かすと、筒の
+   高さぶん境界が置き去りになり、巻き終わり間際に筒の上にカードの帯が
+   残る。筒の中心 = top + height/2 なので、0%地点は9px(初期高さ)の半分の
+   4.5px、100%地点は26px(最終高さ)の半分の13pxをそれぞれ端から残す形に
+   すると、clipのbottom insetとtubeのtop/heightが同じduration・イージング
+   で動くため、常に境界=筒の中心になる */
+@keyframes sendoffRollUp{
+  from{clip-path:inset(0 0 4.5px 0)}
+  to{clip-path:inset(0 0 calc(100% - 13px) 0)}
+}
+/* sendoffRollUp終了時点で残る13px分を、筒が消えるsendoffTubeFadeと
+   同じ間合いで完全に閉じる */
+@keyframes sendoffClipFinish{
+  from{clip-path:inset(0 0 calc(100% - 13px) 0)}
+  to{clip-path:inset(0 0 100% 0)}
+}
+@keyframes sendoffTubeUp{
+  0%{top:calc(100% - 9px);height:9px}
+  100%{top:0;height:26px}
+}
+@keyframes sendoffTubeFade{
+  from{opacity:1}
+  to{opacity:0}
+}
+
+/* ボトル＋メッセージ。画面中央に固定表示するオーバーレイで、
+   演出中(.play)は操作ブロックも兼ねる（pointer-events） */
+.sendoff-overlay{
+  position:fixed;inset:0;z-index:6;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;pointer-events:none;padding:0 24px;
+}
+.sendoff-overlay.play{pointer-events:auto}
+.sendoff-bottle{opacity:0;margin-top:2.5em}
+.sendoff-overlay.play .sendoff-bottle{
+  animation:sendoffBottleIn .8s ease 3.2s forwards,
+            sendoffBottleDrift 2.4s cubic-bezier(.4,.1,.3,1) 4s forwards;
+}
+
+@keyframes sendoffBottleIn{
+  from{opacity:0;scale:.97;rotate:-3deg}
+  to{opacity:1;scale:1;rotate:-3deg}
+}
+@keyframes sendoffBottleDrift{
+  0%{translate:0 0;rotate:-3deg;scale:1;opacity:1}
+  40%{translate:22px -26px;scale:.97;opacity:1}
+  100%{translate:58px -50px;rotate:-8deg;scale:.88;opacity:0}
+}
+@media (prefers-reduced-motion:reduce){
+  /* 常時ではなく.play中（＝送り出し演出の間）だけスキップする。
+     スコープを付け忘れると、投稿前の写真選択中の表示まで消えてしまう。
+     メッセージ文言は投稿完了画面(scr-done)側に常設テキストとして
+     移したため、ここでは.sendoff-stage（ポラロイドの巻き上げ）だけを
+     スキップすればよい。ボトルは元々装飾用でopacity:0の初期値のまま
+     グローバルなアニメーション無効化ルールに従って非表示になる */
+  .sendoff-stage.play{display:none}
 }
 
 /* 投稿完了画面: 遷移が落ち着いてから本文をフェードイン */
@@ -504,22 +627,37 @@ footer a{color:inherit;text-decoration:none;border-bottom:1px solid rgba(207,201
   <!-- ============ 画面3: 投稿（海に流す） ============ -->
   <section class="screen" id="scr-post" aria-label="海に流す">
     <p class="passage post-lead" id="post-lead" style="margin-top:2.6em;margin-bottom:3em">今度はこっそりと、<br>あなたの感性を誰かに届けてみませんか？</p>
-    <div class="polaroid" id="post-polaroid">
-      <div class="cap-row">
-        <input class="caption-input" id="cap-input" type="text" inputmode="text"
-               enterkeyhint="done" maxlength="40"
-               placeholder="説明を入力（任意）" autocomplete="off">
-        <div class="counter" id="cap-counter">0/15</div>
+    <div class="sendoff-stage" id="sendoff-stage">
+      <div class="sendoff-shadow">
+        <div class="sendoff-clip">
+          <div class="polaroid" id="post-polaroid">
+            <div class="cap-row">
+              <input class="caption-input" id="cap-input" type="text" inputmode="text"
+                     enterkeyhint="done" maxlength="40"
+                     placeholder="説明を入力（任意）" autocomplete="off">
+              <div class="counter" id="cap-counter">0/15</div>
+            </div>
+            <div class="photo">
+              <div class="post-img" id="post-pic"></div>
+              <button class="pick" id="btn-pick" type="button">＋ 写真を選ぶ</button>
+              <div class="photo-note" id="photo-note"></div>
+              <input type="file" id="file-input" accept="image/*" hidden>
+              <input type="file" id="camera-input" accept="image/*" capture="environment" hidden>
+            </div>
+            <div class="skirt">
+              <button class="send-btn" id="btn-send" type="button" disabled>海に流す</button>
+            </div>
+          </div>
+        </div>
       </div>
-      <div class="photo">
-        <div class="post-img" id="post-pic"></div>
-        <button class="pick" id="btn-pick" type="button">＋ 写真を選ぶ</button>
-        <div class="photo-note" id="photo-note"></div>
-        <input type="file" id="file-input" accept="image/*" hidden>
-        <input type="file" id="camera-input" accept="image/*" capture="environment" hidden>
+      <div class="sendoff-roll">
+        <div class="sendoff-curl"></div>
+        <div class="sendoff-tube"></div>
       </div>
-      <div class="skirt">
-        <button class="send-btn" id="btn-send" type="button" disabled>海に流す</button>
+    </div>
+    <div class="sendoff-overlay" id="sendoff-overlay" hidden>
+      <div class="sendoff-bottle">
+        <img src="bottle.png" alt="" width="190">
       </div>
     </div>
     <button class="to-top" id="post-to-top" type="button">TOPへ戻る</button>
@@ -529,8 +667,7 @@ footer a{color:inherit;text-decoration:none;border-bottom:1px solid rgba(207,201
   <section class="screen" id="scr-done" aria-label="投稿完了">
     <div class="done-body pending" id="done-body">
       <div class="done-main">
-        <p class="passage">あなたの写真は海を漂い、<br>誰かのもとへ流れ着きます。</p>
-        <p class="passage">あなたの感性がどんな旅をしたかをお伝えします。<br>明日の今頃、こちらにのぞきに来てください。</p>
+        <p class="passage">あなたの一枚が、誰かの岸へ向かっています<br>明日の朝7時、しらせが流れ着きます</p>
         <div class="done-actions">
           <button class="btn" id="btn-give2see">誰かの感性に触れる</button>
           <button class="btn" id="btn-post-again">もう一通海に流す</button>
@@ -630,8 +767,19 @@ const appYesterdayStr = () => {
 };
 
 /* ---------- ユーザーID (localStorage で永続化) ---------- */
+/* crypto.randomUUID はセキュアコンテキスト（https: /localhost）専用。
+   LAN IP経由のhttp:での実機確認時など非セキュアコンテキストでは存在しないため、
+   crypto.getRandomValues（セキュアコンテキスト不問）で自前生成するフォールバックを用意する。 */
+function genUUID(){
+  if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = [...bytes].map(b => b.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`;
+}
 let userId = localStorage.getItem("shor:uid");
-if (!userId) { userId = crypto.randomUUID(); localStorage.setItem("shor:uid", userId); }
+if (!userId) { userId = genUUID(); localStorage.setItem("shor:uid", userId); }
 
 /* ---------- 日次状態 (localStorage) ---------- */
 const store = {
@@ -694,7 +842,7 @@ function pruneMyPostThumbs(){
 async function uploadPhoto(dataUrl){
   const res = await fetch(dataUrl);
   const blob = await res.blob();
-  const fileName = `${crypto.randomUUID()}.jpg`;
+  const fileName = `${genUUID()}.jpg`;
   const { error } = await db.storage.from("photos").upload(fileName, blob, {
     contentType: "image/jpeg", cacheControl: "3600"
   });
@@ -1044,6 +1192,11 @@ function openPost(){
   $("post-lead").hidden = false;
   $("post-polaroid").hidden = false;
   show("scr-post");
+  /* 送り出し演出のボトル画像(bottle.png)は演出開始から約3秒後に登場するが、
+     投稿完了までノーロードのままだと初回表示時に欠けたり遅れたりするため、
+     投稿画面を開いた時点で先読みしておく（2回目以降はブラウザキャッシュ
+     が効くので毎回呼んでも無害） */
+  new Image().src = "bottle.png";
 }
 
 function postValid(){
@@ -1138,33 +1291,62 @@ btnSend.addEventListener("click", async () => {
     store.set("myPosts", myPosts);
     addPostGrant();
 
-    $("post-polaroid").classList.add("washed");
     $("post-lead").classList.add("gone");
-    setTimeout(() => {
-      const body = $("done-body");
-      body.style.transition = "none";
-      body.classList.add("pending");
-      void body.offsetWidth;
-      body.style.transition = "";
-      openDone();
-      setTimeout(() => {
-        $("done-body").classList.remove("pending");
-        const pol = $("post-polaroid"), lead = $("post-lead");
-        const prevPol = pol.style.transition, prevLead = lead.style.transition;
-        pol.style.transition = "none"; lead.style.transition = "none";
-        pol.classList.remove("washed");
-        lead.classList.remove("gone");
-        resetPostForm();
-        void pol.offsetWidth;
-        pol.style.transition = prevPol; lead.style.transition = prevLead;
-      }, 1250);
-    }, 900);
+    playSendoff();
   } catch(err) {
     btnSend.disabled = false;
     btnSend.textContent = "海に流す";
     whisper("送信に失敗しました。もう一度お試しください。", 5000);
   }
 });
+
+/* 投稿完了の送り出し演出。ポラロイドが上へ巻かれる(2.2s)→0.5s静止→
+   筒がフェードアウト(0.5s)→写真入りボトルがフェードイン(0.8s)→
+   ボトルが漂いながらフェードアウト(2.4s、4.0〜6.4s)→既存の完了遷移、
+   の間合いは全て.sendoff-stage.play / .sendoff-overlay.play のCSS
+   アニメーションに任せている。JS側は再生開始とSENDOFF_TOTAL_MS後の
+   後始末だけ行う。「あなたの一枚が、誰かの岸へ向かっています」の文言は
+   演出用の別ステップではなく、遷移先の投稿完了画面(scr-done)の常設
+   テキストとして表示するため、ボトルが消え切る6.4sの少し後に遷移する */
+const SENDOFF_TOTAL_MS = 6800;
+function playSendoff(){
+  const stage = $("sendoff-stage"), overlay = $("sendoff-overlay");
+  stage.classList.remove("play");
+  overlay.classList.remove("play");
+  void stage.offsetWidth; /* 連投時も確実に再生し直せるようreflowを挟む */
+  overlay.hidden = false;
+  stage.classList.add("play");
+  overlay.classList.add("play");
+  setTimeout(() => {
+    const body = $("done-body");
+    body.style.transition = "none";
+    body.classList.add("pending");
+    void body.offsetWidth;
+    body.style.transition = "";
+    openDone();
+    overlay.hidden = true;
+    overlay.classList.remove("play");
+    /* done-bodyのpendingは画面遷移フェード（--dur-fade）と同時に外す。
+       ここで足止めすると、画面自体のフェードが終わった後にdone-body側の
+       フェード（1100ms）がさらに追加で走ってしまい、ボトルが消えてから
+       完了画面の文言が読めるまでが不必要に長く感じられる */
+    body.classList.remove("pending");
+    /* stageの.play解除（＝clip-pathが全開の初期状態へ戻る）はここでは行わない。
+       画面遷移フェード（--dur-fade）の最中にカードが再び全開表示され、
+       投稿写真が一瞬見えてしまうため、完全に隠れ切る下のsetTimeout
+       （resetPostForm()と同じタイミング）まで巻き取り状態を維持する */
+    setTimeout(() => {
+      stage.classList.remove("play");
+      const lead = $("post-lead");
+      const prevLead = lead.style.transition;
+      lead.style.transition = "none";
+      resetPostForm();
+      lead.classList.remove("gone");
+      void lead.offsetWidth;
+      lead.style.transition = prevLead;
+    }, 1250);
+  }, SENDOFF_TOTAL_MS);
+}
 
 function resetPostForm(){
   capInput.value = ""; pickedDataUrl = null;

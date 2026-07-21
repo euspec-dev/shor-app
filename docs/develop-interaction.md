@@ -1,7 +1,7 @@
 # 現像インタラクション（長押し）
 
 scr-view画面で、ブラウザ写真のポラロイドを「現像」するための長押し操作の
-実装。コードは[shor.html:935-1017](../shor.html#L935-L1017)にまとまっている。
+実装。コードは[shor.html:1084-1167](../shor.html#L1084-L1167)にまとまっている。
 枠の消費・サーバ側の予約タイミングとの関係は[view-grants.md](view-grants.md)・
 [distribution.md](distribution.md)を参照。ここでは操作そのものの状態遷移を扱う。
 
@@ -16,16 +16,16 @@ scr-view画面で、ブラウザ写真のポラロイドを「現像」するた
 | `confirmPromise` | 現像完了時に発火した`confirmDrift()`のPromise（`release()`が待ち合わせに使う） |
 | `noteTimer` | 「離すのが早すぎる」ナグメッセージの自動非表示タイマー |
 
-`resetDevelop(hard)`（[shor.html:941-950](../shor.html#L941-L950)）が
+`resetDevelop(hard)`（[shor.html:1089-1098](../shor.html#L1089-L1098)）が
 これらを初期状態に戻す。`hard=true`は新しい写真を開いたとき
 （`openView()`内）、`hard=false`は現像未完了のまま指を離したときに使う
 （`hard=false`では下部の案内テキストは消さない）。
 
 ## 押している間: `tick(now)`
 
-`DEVELOP_MS = 5000`（[shor.html:611](../shor.html#L611)）で正規化した
+`DEVELOP_MS = 5000`（[shor.html:748](../shor.html#L748)）で正規化した
 進捗`t`（0〜1）から、`e = 1 - (1-t)^2`という減速イージングを作り、
-写真のぼかしと粒度を滑らかに解いていく（[shor.html:952-967](../shor.html#L952-L967)）。
+写真のぼかしと粒度を滑らかに解いていく（[shor.html:1100-1115](../shor.html#L1100-L1115)）。
 
 ```
 blur      : 26px → 0px          (26 * (1 - e))
@@ -40,7 +40,7 @@ frost透明度: 1   → 0            (1 - e)
 - 現像完了ラベルの表示切り替え、「写真が現像されました。指を離すと写真は
   見られなくなります。」という案内を表示
 
-案内文（`#under-note`）は`min-height:3.9em`（[shor.html:311](../shor.html#L311)）を
+案内文（`#under-note`）は`min-height:3.9em`（[shor.html:434](../shor.html#L434)）を
 持たせてあり、表示/非表示で本文の高さが変わらないようにしている。この文言は
 `<br>`で強制的に2行になるため、以前`min-height`が2行分に足りておらず、
 文言が出た瞬間にscr-view全体の位置がわずかにずれるバグがあった（修正済み）。
@@ -50,7 +50,7 @@ frost透明度: 1   → 0            (1 - e)
 
 ## 押し始め: `pointerdown`
 
-`zone.setPointerCapture(e.pointerId)`（[shor.html:972](../shor.html#L972)）
+`zone.setPointerCapture(e.pointerId)`（[shor.html:1120](../shor.html#L1120)）
 でポインタをキャプチャし、指がゾーンの外に出てもイベントを取り続けられる
 ようにしている（＝押している間にスクロール等で指がずれても`pointerup`を
 確実に拾える）。`leaving`中（wash演出中）は新しい押下を無視する。
@@ -65,7 +65,7 @@ frost透明度: 1   → 0            (1 - e)
 1. `leaving = true`にして以降の押下を無視
 2. `confirmPromise`の完了を待ってから`recordViewHistoryDB()`で
    `viewed_seconds`を確定更新する非同期処理を(待たずに)開始する
-   （[shor.html:992-996](../shor.html#L992-L996)。UIのwash演出はこれを
+   （[shor.html:1140-1144](../shor.html#L1140-L1144)。UIのwash演出はこれを
    待たずに即座に始まる — 詳細は[distribution.md](distribution.md)の
    「peek → confirm」節）
 3. ポラロイドに`washed`クラス、案内文に`fading`クラスを付けてフェードアウト
@@ -84,7 +84,7 @@ frost透明度: 1   → 0            (1 - e)
 `shor.html`全体で長押しメニュー・選択・ドラッグ保存を無効化している。
 CSS側（[shor.html:59-68](../shor.html#L59-L68)）で
 `user-select`/`touch-callout`/`user-drag`等を`none`にし、その上でJS側
-（[shor.html:759-760](../shor.html#L759-L760)、`contextmenu`/`selectstart`/
+（[shor.html:907-908](../shor.html#L907-L908)、`contextmenu`/`selectstart`/
 `dragstart`の`preventDefault`）が「最終防衛線」として二重に無効化している。
 これは現像ゾーンの長押しがOS標準のコンテキストメニューやテキスト選択と
 衝突しないようにするための、アプリ全体にかかる前提。
