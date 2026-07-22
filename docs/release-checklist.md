@@ -37,8 +37,9 @@
 - [ ] テスト投稿・テストユーザー・テスト画像が本番DB/ストレージに残っていない
       （`posts` / `view_history` / `users` / Storageの`photos`バケットを
       ダッシュボードで目視確認）
-- [ ] `distribution_config`の値（K・重み・TTL・視聴枠）が意図した値になっている
-      （既定値のままでよいか、運用前に一度見直す）
+- [ ] `distribution_config`の値（K・重み・物理削除までの日数・視聴枠）が
+      意図した値になっている（既定値のままでよいか、運用前に一度見直す。
+      配信期限は撤廃済みで存在しない）
 - [ ] シード投稿（コールドスタート対策）を用意する場合は投入済み
       （`is_seed=true`, `author_id=null`。詳細は[distribution.md](distribution.md)）
 - [ ] `photos`ストレージバケットが`public`になっている
