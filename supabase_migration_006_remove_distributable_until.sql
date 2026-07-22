@@ -160,21 +160,26 @@ $$;
 grant execute on function confirm_drift(uuid, uuid) to anon, authenticated;
 
 -- ------------------------------------------------------------
--- 3. current_display_ttl_hours() を削除
+-- 3. posts: status enum から expired を削除し、distributable_until 列を削除
+--    （distributable_untilのデフォルト値がcurrent_display_ttl_hours()に
+--    依存しているため、関数を消す前にこちらを先に片付ける。同様に旧
+--    idx_posts_candidateインデックスもdistributable_untilを含んでいた
+--    ため、カラムを消す前にインデックスを先に落とす）
 -- ------------------------------------------------------------
-drop function if exists current_display_ttl_hours();
+drop index if exists idx_posts_candidate;
 
--- ------------------------------------------------------------
--- 4. posts: status enum から expired を削除し、distributable_until 列を削除
--- ------------------------------------------------------------
 update posts set status = 'exhausted' where status = 'expired'; -- 現状未使用のはずだが念のため
 alter table posts drop constraint if exists posts_status_check;
 alter table posts add constraint posts_status_check check (status in ('active','exhausted'));
 alter table posts drop column if exists distributable_until;
 
--- distributable_until を含んでいたインデックスを張り直す
-drop index if exists idx_posts_candidate;
 create index if not exists idx_posts_candidate on posts (status, view_count);
+
+-- ------------------------------------------------------------
+-- 4. current_display_ttl_hours() を削除
+--    （distributable_until列を消した後なので、依存関係は残っていない）
+-- ------------------------------------------------------------
+drop function if exists current_display_ttl_hours();
 
 -- ------------------------------------------------------------
 -- 5. distribution_config: display_ttl_hours / w_urgency を削除
