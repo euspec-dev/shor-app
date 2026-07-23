@@ -211,13 +211,27 @@ footer a{color:inherit;text-decoration:none;border-bottom:1px solid rgba(207,201
 .unroll-stage{position:relative;width:min(86vw,350px);opacity:0;transition:opacity 300ms ease}
 .unroll-stage.play{opacity:1}
 .polaroid-shadow{
-  transform:rotate(1.5deg); /* clip-path側と一緒に回すことで開く途中のゆがみを防ぐ */
+  transform:rotate(1.5deg); /* clip-path側と一緒に回すことで開く途中のゆがみを防ぐ。
+    .sendoff-shadowと違いtransform:translateZ(0)を別途足す必要はない — この
+    rotate自体が既に独立した合成レイヤーを作るため、backdrop-filterがclip-pathの
+    毎フレームの変化に正しく追従する（理由は.sendoff-shadowのコメント参照） */
   filter:drop-shadow(0 14px 26px rgba(45,36,26,.38)) drop-shadow(0 2px 5px rgba(45,36,26,.22));
 }
 .polaroid-clip{
-  clip-path:inset(0 0 100% 0 round 2px);
-  border-radius:2px;
+  overflow:hidden;border-radius:2px; /* 角丸はここ(静的)だけが担う。.sendoff-clipと同じ
+    理由（round付きclip-pathをアニメーションさせると境界付近にカードが薄く残ることが
+    ある）で、アニメ対象のclip-pathからはroundを外し、角丸はoverflow:hiddenの
+    border-radiusに一本化してある */
+  clip-path:inset(0 0 100% 0);
+  will-change:clip-path;
 }
+/* 巻いている最中だけ.frostのbackdrop-filterを無効化する。.sendoff-stageと同じ理由
+   （WebKitがbackdrop-filterの背景ぼかし層を祖先のclip-pathで切り取れないことがあり、
+   本体が閉じていても磨りガラス層だけ筒の外側にはみ出て見えることがある）だが、
+   こちらは演出後も同じ#view-polaroidで現像インタラクション（.frostのぼかし）を
+   使い続けるため、.playとは別に.rollingという専用クラスで演出中だけ無効化し、
+   巻紙が開き切ったらJS側（openView）で.rollingを外して元に戻す */
+.unroll-stage.play.rolling .polaroid{backdrop-filter:none;-webkit-backdrop-filter:none}
 .roll-wrap{
   position:absolute;left:2px;right:2px;top:calc(50% - 13px);height:26px;
   transform:rotate(1.5deg); /* 開いたポラロイド(#view-polaroid)の傾きと揃える */
@@ -240,25 +254,55 @@ footer a{color:inherit;text-decoration:none;border-bottom:1px solid rgba(207,201
 }
 
 .unroll-stage.play .string{animation:strFall .95s .4s cubic-bezier(.5,.1,.7,1) forwards}
-.unroll-stage.play .roll-wrap{animation:rollGo 2.6s 1.0s forwards}
-.unroll-stage.play .polaroid-clip{animation:sheetOpen 1.95s 1.65s cubic-bezier(.4,.1,.3,1) forwards}
-.unroll-stage.play .polaroid-shadow{animation:sheetSettle .6s 3.6s ease-out}
+.unroll-stage.play .roll-wrap{
+  animation:rollGo 2.6s 1.0s cubic-bezier(.4,.1,.3,1) forwards,
+            rollFade .3s ease 3.8s forwards;
+}
+.unroll-stage.play .polaroid-clip{
+  /* clip境界を「筒の中心」に合わせる考え方は.sendoff-clipと同じ（詳細は下の
+     sendoffRollUp相当のコメント、旧実装との違いは下記sheetOpen参照）。unrollは
+     逆方向（中央の筒→上端→下端の細い帯で消える）なので、sheetOpenはrollGoの
+     25%〜100%区間（筒が上端から下端の細い帯へ移動する区間）とdelay・duration・
+     easingを完全に揃えて動かし、常に境界=筒の中心を保つ。筒が完全に消える
+     sheetCloseFinishも、rollFadeと同じ間合いで重ねて筒とカードの消えるタイミングを揃える */
+  animation:sheetOpen 1.95s 1.65s cubic-bezier(.4,.1,.3,1) forwards,
+            sheetCloseFinish .3s ease 3.8s forwards;
+}
+.unroll-stage.play .polaroid-shadow{animation:sheetSettle .6s 4.1s ease-out}
 
 @keyframes strFall{
   0%{transform:translateX(-50%) rotate(0)}
   22%{transform:translateX(-45%) rotate(-11deg);opacity:1}
   100%{transform:translate(-14%,280px) rotate(62deg);opacity:0}
 }
-/* 中央(50%)→上端(0)へ移動(0-25%)、上端→下端へ転がりながら消える(25-100%) */
+/* 中央(50%)→上端(0)へ移動(0-25%、独自のイージング)、上端→下端の細い帯へ転がる
+   (25-100%、animation本体のイージングをそのまま使う＝sheetOpenと同じcubic-bezier)。
+   opacityはここに含めず別animation(rollFade)に分離してある — 以前は86%キーフレームが
+   opacityのためだけに存在し、そこでtop/heightの補間イージングが（明示指定のない
+   区間としてデフォルトのeaseに）分断されてsheetOpenとズレる原因になっていた */
 @keyframes rollGo{
   0%{top:calc(50% - 13px);height:26px;animation-timing-function:cubic-bezier(.5,0,.4,1)}
-  25%{top:0;height:26px;animation-timing-function:cubic-bezier(.4,.1,.3,1)}
-  86%{opacity:1}
-  100%{top:calc(100% - 9px);height:9px;opacity:0}
+  25%{top:0;height:26px}
+  100%{top:calc(100% - 9px);height:9px}
 }
+@keyframes rollFade{
+  from{opacity:1}
+  to{opacity:0}
+}
+/* 筒は上端基準(top)で動くため、境界を単純に100%→0%（高さゼロの線）で動かすと、
+   筒の高さぶん境界が置き去りになる。筒の中心 = top + height/2 なので、開始地点
+   (rollGoの25%地点、top:0/height:26px)の中心は13px、終了地点(rollGoの100%地点、
+   top:calc(100% - 9px)/height:9px)の中心はcalc(100% - 4.5px)。clipのbottom insetは
+   「隠れている量」なので、その補数（100%からその位置を引いた値）を使う */
 @keyframes sheetOpen{
-  from{clip-path:inset(0 0 100% 0 round 2px)}
-  to{clip-path:inset(0 0 0 0 round 2px)}
+  from{clip-path:inset(0 0 calc(100% - 13px) 0)}
+  to{clip-path:inset(0 0 4.5px 0)}
+}
+/* sheetOpen終了時点で残る4.5px分（筒の最終半径）を、筒が消えるrollFadeと
+   同じ間合いで完全に閉じる。これで筒が消えるのとカードが開き切るタイミングが揃う */
+@keyframes sheetCloseFinish{
+  from{clip-path:inset(0 0 4.5px 0)}
+  to{clip-path:inset(0 0 0 0)}
 }
 @keyframes sheetSettle{
   /* transformはkeyframe側で完全に上書きされるため、.polaroid-shadowの
@@ -268,7 +312,7 @@ footer a{color:inherit;text-decoration:none;border-bottom:1px solid rgba(207,201
   100%{transform:rotate(1.5deg) translateY(0)}
 }
 @media (prefers-reduced-motion:reduce){
-  .unroll-stage.play .polaroid-clip{clip-path:inset(0 0 0 0 round 2px)}
+  .unroll-stage.play .polaroid-clip{clip-path:inset(0 0 0 0)}
   .unroll-stage.play .roll-wrap,
   .unroll-stage.play .string{opacity:0}
 }
@@ -458,11 +502,27 @@ footer a{color:inherit;text-decoration:none;border-bottom:1px solid rgba(207,201
 .counter.over{color:var(--rust)}
 .caption-input.over{color:var(--rust)}
 
-.polaroid .photo .post-img{
+/* 投稿写真の拡大縮小・移動調整。#post-photoがジェスチャーの当たり判定
+   コンテナ（touch-action:noneでブラウザ標準のスクロール/ズームを無効化し、
+   ピンチ/ドラッグは自前実装する）。.post-blurは常に枠いっぱいをcoverで
+   覆う固定のぼかしレイヤーで、ドラッグ・ピンチの影響を受けない。
+   .post-adjustが実際に動かす本体画像本体で、transform:translate() scale()
+   のみを使う（回転は一切追加しない）。本体が枠を覆っているときは.post-blurは
+   完全に隠れ、縮小して余白ができたときだけ隙間から見える。 */
+#post-photo{touch-action:none}
+.polaroid .photo .post-blur{
   position:absolute;inset:0;background-size:cover;background-position:center;
-  opacity:0;transition:opacity 700ms ease;pointer-events:none;
+  filter:blur(20px) saturate(.92);transform:scale(1.1); /* ぼかしの縁漏れ防止 */
+  opacity:0;transition:opacity 700ms ease;
 }
-.polaroid .photo .post-img.loaded{opacity:1}
+.polaroid .photo .post-blur.loaded{opacity:1}
+.polaroid .photo .post-adjust{
+  position:absolute;left:0;top:0;transform-origin:0 0;
+  opacity:0;transition:opacity 700ms ease;
+  /* pointer-events:noneはグローバルなimg{}ルール(shor.html:68)に既に含まれる。
+     ジェスチャーは#post-photo側でまとめて処理するため、imgでは拾わない */
+}
+.polaroid .photo .post-adjust.loaded{opacity:1}
 .pick{position:absolute;inset:0;display:grid;place-items:center;cursor:pointer;
   color:rgba(245,241,232,.6);font-size:11px;font-weight:400;letter-spacing:.32em;text-indent:.32em;
   transition:opacity 500ms ease;background:transparent;border:none;
@@ -637,8 +697,9 @@ footer a{color:inherit;text-decoration:none;border-bottom:1px solid rgba(207,201
                      placeholder="説明を入力（任意）" autocomplete="off">
               <div class="counter" id="cap-counter">0/15</div>
             </div>
-            <div class="photo">
-              <div class="post-img" id="post-pic"></div>
+            <div class="photo" id="post-photo">
+              <div class="post-blur" id="post-blur"></div>
+              <img class="post-adjust" id="post-adjust" alt="" hidden>
               <button class="pick" id="btn-pick" type="button">＋ 写真を選ぶ</button>
               <div class="photo-note" id="photo-note"></div>
               <input type="file" id="file-input" accept="image/*" hidden>
@@ -1075,8 +1136,12 @@ async function openView(origin){
   /* メッセージのフェードアウト(3300ms開始+1100ms=4400msで消え切る)が
      完全に終わってから巻紙を表示する */
   introTimers.push(setTimeout(() => {
-    unrollStage.classList.add("play"); /* ひもがほどけてポラロイドが開く演出を開始 */
+    /* rollingは.frostのbackdrop-filterをclip-pathアニメ中だけ無効化するための
+       クラス（詳細はCSS側.unroll-stage.play.rolling .polaroidのコメント参照）。
+       巻紙が開き切る頃（4.1s後）に外し、以降の現像インタラクションに影響しないようにする */
+    unrollStage.classList.add("play", "rolling"); /* ひもがほどけてポラロイドが開く演出を開始 */
     snote.classList.remove("pending");
+    introTimers.push(setTimeout(() => unrollStage.classList.remove("rolling"), 4100));
   }, 4500));
 }
 
@@ -1172,8 +1237,190 @@ zone.addEventListener("pointercancel", release);
 const capInput = $("cap-input"), capCounter = $("cap-counter"),
       btnSend = $("btn-send"), btnPick = $("btn-pick"),
       fileInput = $("file-input"), cameraInput = $("camera-input"),
-      postPic = $("post-pic"), photoNote = $("photo-note");
+      postPhoto = $("post-photo"), postBlur = $("post-blur"), postAdjust = $("post-adjust"),
+      photoNote = $("photo-note");
 let pickedDataUrl = null;
+
+/* ---- 写真の拡大縮小・移動調整 ----
+   adjust = {scale, tx, ty, minScale, maxScale, natW, natH} | null。
+   #post-adjustはnatW×natHの実寸で置き、transform:translate(tx,ty) scale(scale)
+   （transform-origin:0 0）だけで動かす。回転は一切扱わない。 */
+let adjust = null;
+const activePointers = new Map(); // pointerId -> {x, y}（ブラウザ座標）
+let gestureStart = null;
+
+function adjustBox(){ return postPhoto.clientWidth; } // 正方形なのでwidth=height
+
+function clampAdjust(){
+  if (!adjust) return;
+  const box = adjustBox();
+  adjust.scale = Math.max(adjust.minScale, Math.min(adjust.maxScale, adjust.scale));
+  const w = adjust.natW * adjust.scale, h = adjust.natH * adjust.scale;
+  /* X/Y独立で判定する。枠を覆っている軸（w>=box）は「枠外に隙間が出ない範囲」で
+     自由に移動でき、余白がある軸（w<box）はその軸を中央に固定する */
+  adjust.tx = (w >= box)
+    ? Math.max(box - w, Math.min(0, adjust.tx))
+    : (box - w) / 2;
+  adjust.ty = (h >= box)
+    ? Math.max(box - h, Math.min(0, adjust.ty))
+    : (box - h) / 2;
+}
+function applyAdjust(){
+  if (!adjust) return;
+  postAdjust.style.transform = `translate(${adjust.tx}px,${adjust.ty}px) scale(${adjust.scale})`;
+}
+
+function startAdjust(dataUrl){
+  postBlur.style.backgroundImage = `url("${dataUrl}")`;
+  const img = new Image();
+  img.onload = () => {
+    const box = adjustBox();
+    const coverScale = box / Math.min(img.naturalWidth, img.naturalHeight);
+    const containScale = box / Math.max(img.naturalWidth, img.naturalHeight); // = minScale
+    activePointers.clear();
+    gestureStart = null;
+    adjust = {
+      scale: coverScale, minScale: containScale, maxScale: coverScale * 4,
+      natW: img.naturalWidth, natH: img.naturalHeight,
+      tx: (box - img.naturalWidth * coverScale) / 2,
+      ty: (box - img.naturalHeight * coverScale) / 2,
+    };
+    postAdjust.src = dataUrl;
+    postAdjust.style.width = img.naturalWidth + "px";
+    postAdjust.style.height = img.naturalHeight + "px";
+    clampAdjust();
+    applyAdjust();
+    postAdjust.hidden = false;
+    postBlur.classList.add("loaded");
+    postAdjust.classList.add("loaded");
+  };
+  img.src = dataUrl;
+}
+
+function resetAdjust(){
+  adjust = null;
+  activePointers.clear();
+  gestureStart = null;
+  postAdjust.removeAttribute("src");
+  postAdjust.hidden = true;
+  postAdjust.classList.remove("loaded");
+  postAdjust.style.transform = "";
+  postBlur.style.backgroundImage = "none";
+  postBlur.classList.remove("loaded");
+}
+
+/* ジェスチャー開始時点の状態を1つのスナップショットに固定し、以後の
+   pointermoveはこのスナップショットからの差分で計算する（フレームごとの
+   積み上げ誤差を避けるため）。指の本数が変わるたび（追加/離脱）に
+   撮り直す。2本指の距離比だけでスケールを求め、角度は一切見ないため、
+   回転成分は構造的に混入しない。 */
+function snapshotGesture(){
+  const pts = [...activePointers.values()];
+  const rect = postPhoto.getBoundingClientRect();
+  let midX, midY, dist = 0;
+  if (pts.length === 1){
+    midX = pts[0].x; midY = pts[0].y;
+  } else {
+    midX = (pts[0].x + pts[1].x) / 2; midY = (pts[0].y + pts[1].y) / 2;
+    dist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+  }
+  return {
+    count: pts.length,
+    scale: adjust.scale,
+    dist,
+    ix: (midX - rect.left - adjust.tx) / adjust.scale,
+    iy: (midY - rect.top - adjust.ty) / adjust.scale,
+  };
+}
+function updateGesture(){
+  if (!adjust || !gestureStart) return;
+  const pts = [...activePointers.values()];
+  const rect = postPhoto.getBoundingClientRect();
+  let midX, midY, newScale = gestureStart.scale;
+  if (pts.length === 1){
+    midX = pts[0].x; midY = pts[0].y;
+  } else {
+    midX = (pts[0].x + pts[1].x) / 2; midY = (pts[0].y + pts[1].y) / 2;
+    if (gestureStart.count >= 2 && gestureStart.dist > 0){
+      const dist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+      newScale = gestureStart.scale * (dist / gestureStart.dist);
+    }
+  }
+  adjust.scale = newScale;
+  adjust.tx = (midX - rect.left) - gestureStart.ix * adjust.scale;
+  adjust.ty = (midY - rect.top) - gestureStart.iy * adjust.scale;
+  clampAdjust();
+  applyAdjust();
+}
+
+postPhoto.addEventListener("pointerdown", e => {
+  if (!adjust) return;
+  if (e.target.closest(".pick")) return; /* 撮り直しボタンのタップはジェスチャーとして拾わない */
+  postPhoto.setPointerCapture(e.pointerId);
+  activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  gestureStart = snapshotGesture();
+});
+postPhoto.addEventListener("pointermove", e => {
+  if (!adjust || !activePointers.has(e.pointerId)) return;
+  activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  updateGesture();
+});
+function endAdjustPointer(e){
+  if (!activePointers.has(e.pointerId)) return;
+  activePointers.delete(e.pointerId);
+  gestureStart = activePointers.size ? snapshotGesture() : null;
+}
+postPhoto.addEventListener("pointerup", endAdjustPointer);
+postPhoto.addEventListener("pointercancel", endAdjustPointer);
+
+/* PC確認用のホイールズーム（任意）。ポインタ位置を中心に拡大縮小する */
+postPhoto.addEventListener("wheel", e => {
+  if (!adjust) return;
+  e.preventDefault();
+  const rect = postPhoto.getBoundingClientRect();
+  const localX = e.clientX - rect.left, localY = e.clientY - rect.top;
+  const ix = (localX - adjust.tx) / adjust.scale;
+  const iy = (localY - adjust.ty) / adjust.scale;
+  adjust.scale *= Math.exp(-e.deltaY * 0.001);
+  adjust.tx = localX - ix * adjust.scale;
+  adjust.ty = localY - iy * adjust.scale;
+  clampAdjust();
+  applyAdjust();
+}, { passive: false });
+
+/* 送信時、現在のズーム/位置とぼかし背景を1枚のcanvasに焼き込んで書き出す。
+   元画像や位置情報は保存せず、投稿画面で見えている見た目そのままの
+   正方形JPEGだけをアップロードする */
+function cropAdjusted(outSize){
+  return new Promise((resolve, reject) => {
+    if (!adjust) { reject(new Error("no image")); return; }
+    const snapshot = adjust, box = adjustBox();
+    const k = outSize / box;
+    const srcImg = new Image();
+    srcImg.onload = () => {
+      const c = document.createElement("canvas");
+      c.width = outSize; c.height = outSize;
+      const ctx = c.getContext("2d");
+
+      /* 1. ぼかし背景（.post-blurと同じcover+scale(1.1)をcanvasの解像度で再現） */
+      ctx.save();
+      ctx.filter = `blur(${20 * k}px)`;
+      const bgScale = (outSize / Math.min(srcImg.naturalWidth, srcImg.naturalHeight)) * 1.1;
+      const bw = srcImg.naturalWidth * bgScale, bh = srcImg.naturalHeight * bgScale;
+      ctx.drawImage(srcImg, (outSize - bw) / 2, (outSize - bh) / 2, bw, bh);
+      ctx.restore();
+
+      /* 2. 本体写真を現在のscale/位置のまま重ねて描画 */
+      const dw = snapshot.natW * snapshot.scale * k, dh = snapshot.natH * snapshot.scale * k;
+      const dx = snapshot.tx * k, dy = snapshot.ty * k;
+      ctx.drawImage(srcImg, dx, dy, dw, dh);
+
+      resolve(c.toDataURL("image/jpeg", .86));
+    };
+    srcImg.onerror = () => reject(new Error("failed to load picked image"));
+    srcImg.src = pickedDataUrl;
+  });
+}
 /* 撮り直しボタン用のカメラアイコン（線画、他要素と揃えてstroke基調） */
 const CAMERA_ICON_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l1.5-2h7L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.5"/></svg>';
 const PICK_LABEL = "＋ 写真を選ぶ";
@@ -1258,8 +1505,7 @@ async function handlePickedFile(file, fromCamera){
     }
   }
   pickedDataUrl = await downscale(file, 1280);
-  postPic.style.backgroundImage = `url("${pickedDataUrl}")`;
-  postPic.classList.add("loaded");
+  startAdjust(pickedDataUrl);
   btnPick.classList.add("picked");
   btnPick.setAttribute("aria-label", "写真を変更する");
   btnPick.innerHTML = CAMERA_ICON_SVG;
@@ -1283,9 +1529,10 @@ btnSend.addEventListener("click", async () => {
   btnSend.textContent = "送信中…";
 
   try {
-    const imageUrl = await uploadPhoto(pickedDataUrl);
+    const finalDataUrl = await cropAdjusted(1080);
+    const imageUrl = await uploadPhoto(finalDataUrl);
     const postId = await createPost(imageUrl, capInput.value);
-    const thumb = await makeThumb(pickedDataUrl, 240, .5).catch(() => null);
+    const thumb = await makeThumb(finalDataUrl, 240, .5).catch(() => null);
     const myPosts = store.get("myPosts", []);
     myPosts.push({ id: postId, createdAt: Date.now(), thumb });
     store.set("myPosts", myPosts);
@@ -1350,8 +1597,7 @@ function playSendoff(){
 
 function resetPostForm(){
   capInput.value = ""; pickedDataUrl = null;
-  postPic.style.backgroundImage = "none";
-  postPic.classList.remove("loaded");
+  resetAdjust();
   btnPick.classList.remove("picked");
   btnPick.removeAttribute("aria-label");
   btnPick.textContent = PICK_LABEL;
