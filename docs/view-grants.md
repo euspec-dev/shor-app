@@ -19,21 +19,21 @@
 
 ## クライアント側の実装（localStorage）
 
-- `freeUsedToday()` / `useFreeGrant()` （[shor.html:991-992](../shor.html#L991-L992)）
+- `freeUsedToday()` / `useFreeGrant()` （[shor.html:1008-1009](../shor.html#L1008-L1009)）
   `localStorage` の `shor:viewFreeUsed` に「無料枠を使った日付（`appDayStr()`、
   後述）」を保存する。値が今日の`appDayStr()`と一致していれば「今日はもう
   無料枠を使った」と判定する。
 - `postGrants()` / `addPostGrant()` / `consumePostGrant()`
-  （[shor.html:994-1007](../shor.html#L994-L1007)）
+  （[shor.html:1011-1024](../shor.html#L1011-L1024)）
   `localStorage` の `shor:postGrants` に `{date, count, granted}`
   （`date`は`appDayStr()`）を保存する。`addPostGrant()` は投稿成功時
-  （[shor.html:1539](../shor.html#L1539)、`createPost` 成功直後）に呼ばれる
+  （[shor.html:1556](../shor.html#L1556)、`createPost` 成功直後）に呼ばれる
   が、その日すでに `granted:true` なら何もしない — **同じ日に何通投稿しても、
   投稿ボーナスは+1しか増えない。**
-- `canView()` （[shor.html:1008](../shor.html#L1008)）
+- `canView()` （[shor.html:1025](../shor.html#L1025)）
   `!freeUsedToday() || postGrants() > 0`。無料枠が未消費、または投稿枠の残数が
   あれば閲覧可能。ボタンを押せるかどうかの入り口の判定にのみ使う。
-- `consumeView()` （[shor.html:1009-1012](../shor.html#L1009-L1012)）
+- `consumeView()` （[shor.html:1026-1029](../shor.html#L1026-L1029)）
   無料枠が未消費ならまず無料枠を消費し、消費済みなら投稿枠を1つ消費する。
   **無料枠が優先的に消費される。**
 
@@ -41,7 +41,7 @@
 
 `consumeView()` は「誰かの感性に触れる」を押した時点（＝画面を開いた時点）
 ではなく、**現像インタラクションが完了した瞬間**に呼ばれる
-（[shor.html:1171-1172](../shor.html#L1171-L1172)、`tick()` 内で
+（[shor.html:1188-1189](../shor.html#L1188-L1189)、`tick()` 内で
 `developed` が `true` になる箇所）。
 
 写真を開いただけで長押しをやめて離脱した場合は枠を消費しない。実際に
@@ -53,12 +53,12 @@
 2つのRPCに分けてある。
 
 1. **`peek_drift(viewer_id)`** （候補を選ぶだけ、副作用なし）
-   写真を開いた瞬間 `getRandomDrift()`（[shor.html:1116](../shor.html#L1116)）
+   写真を開いた瞬間 `getRandomDrift()`（[shor.html:1133](../shor.html#L1133)）
    から呼ばれる。加重ランダムで候補を選んで返すだけで、`view_count` の増分も
    `view_history` への記録も一切行わない。何度呼んでも状態は変わらない。
 2. **`confirm_drift(viewer_id, post_id)`** （現像完了時に呼ぶ、ここで確定）
-   `confirmDrift()`（[shor.html:876-881](../shor.html#L876-L881)）から、
-   `tick()` 内で `developed` が `true` になった瞬間（[shor.html:1172](../shor.html#L1172)）
+   `confirmDrift()`（[shor.html:893-898](../shor.html#L893-L898)）から、
+   `tick()` 内で `developed` が `true` になった瞬間（[shor.html:1189](../shor.html#L1189)）
    に呼ばれる。ここで初めて:
    - 1日の視聴上限チェック（後述）
    - 対象投稿がまだ有効か（`peek` から時間が経っている間に上限到達/期限切れ/
@@ -73,7 +73,7 @@
 confirmDrift() の呼び出しは非同期（fire-and-forget）だが、現像完了直後に
 指を離した際に呼ばれる `recordViewHistoryDB()`（`viewed_seconds` の確定更新）
 より先に `view_history` の予約行が挿入されている必要があるため、
-`release()`（[shor.html:1205-1209](../shor.html#L1205-L1209)）は
+`release()`（[shor.html:1222-1226](../shor.html#L1222-L1226)）は
 `confirmDrift()` の完了を待ってから `recordViewHistoryDB()` を呼ぶよう
 順序を保証している。UI側の画面遷移（washed演出など）はこの待ち合わせを
 またずに即座に始まる。
@@ -91,18 +91,18 @@ peek/confirmに分離し、どちらも「現像完了」という同じ瞬間�
 
 ### リセットのタイミング: 深夜0時ではなく朝7時
 
-`appDayStr()` （[shor.html:820-823](../shor.html#L820-L823)）が「アプリ内の
+`appDayStr()` （[shor.html:837-840](../shor.html#L837-L840)）が「アプリ内の
 1日」の文字列を作る。**現在時刻から7時間引いた時点の日付**をその日として
 扱う実装（`APP_DAY_SHIFT_MS = 7 * 60 * 60 * 1000`）で、端末の**ローカル
 時刻**基準。つまり無料枠・投稿枠のリセットは「ローカル時間の朝7時」を境に
 起こり、深夜0時〜6時59分はまだ前日として扱われる。`appYesterdayStr()`
-（[shor.html:824-828](../shor.html#L824-L828)）は同じ区切りでの前日を返す。
+（[shor.html:841-845](../shor.html#L841-L845)）は同じ区切りでの前日を返す。
 
 以前は`todayStr()`（深夜0時区切り）を使っていたが、「1日の区切りが深夜0時
 だと、寝る前・寝起きの生活リズムと合わない」という理由で朝7時区切りに変更した。
 `freeUsedToday`/`postGrants`系の関数（`appDayStr()`を直接使う）だけでなく、
-`renderHome()`の前日結果判定（[shor.html:1031](../shor.html#L1031)）・
-`getResultForDate()`の集計期間（[shor.html:934-954](../shor.html#L934-L954)、
+`renderHome()`の前日結果判定（[shor.html:1048](../shor.html#L1048)）・
+`getResultForDate()`の集計期間（[shor.html:951-971](../shor.html#L951-L971)、
 後述）・devbar（`dev-yesterday`/`dev-skip`）まで、**日付境界に関わる箇所は
 全て`appDayStr()`/`appYesterdayStr()`に統一**してある。
 
@@ -118,8 +118,8 @@ peek/confirmに分離し、どちらも「現像完了」という同じ瞬間�
 `canView() === false` のとき、押した場所によって2箇所で分岐する
 （どちらも同じ文言判定ロジック）。
 
-- ホーム画面「誰かの感性に触れる」（[shor.html:1748-1760](../shor.html#L1748-L1760)）
-- 投稿完了画面「誰かの感性に触れる」（[shor.html:1667-1673](../shor.html#L1667-L1673)）
+- ホーム画面「誰かの感性に触れる」（[shor.html:1799-1811](../shor.html#L1799-L1811)）
+- 投稿完了画面「誰かの感性に触れる」（[shor.html:1684-1690](../shor.html#L1684-L1690)）
 
 その日すでに投稿済み（`postGrants` が `granted:true`）かどうかで文言が変わる。
 
