@@ -2,7 +2,7 @@
 
 Supabase (Postgres + Storage) 上の実体。認証は無く、匿名UUID
 （`localStorage`の`shor:uid`）がそのままユーザーIDとして使われる
-（[shor.html:830-843](../shor.html#L830-L843)）。
+（[shor.html:847-860](../shor.html#L847-L860)）。
 
 ### なぜiOSだけ別のmanifestを使うのか
 
@@ -43,20 +43,20 @@ Safari標準UIが表示され、フルスクリーンのネイティブアプリ
   `Date.now()`（ミリ秒epoch）、`thumb`は長辺240px・JPEG品質0.5の
   サムネイルdataURL
 - 書き込み: `btnSend`のクリックハンドラ内、`createPost()`成功直後
-  （[shor.html:1536-1538](../shor.html#L1536-L1538)）。サムネイルは
-  `makeThumb(finalDataUrl, 240, .5)`（[shor.html:1640-1652](../shor.html#L1640-L1652)）
+  （[shor.html:1553-1555](../shor.html#L1553-L1555)）。サムネイルは
+  `makeThumb(finalDataUrl, 240, .5)`（[shor.html:1657-1669](../shor.html#L1657-L1669)）
   で生成する。`finalDataUrl`は投稿本体のアップロードにも使う
   `cropAdjusted()`（[screens.md](screens.md)の「投稿写真の拡大縮小・移動調整」
   節参照）の出力そのもので、`downscale()`（写真選択直後の縮小用）とは別の
   軽量版。既にJPEG化済みのdataURLを再度縮小するだけなのでFile/Blobを
   経由しない
-- 掃除: `pruneMyPostThumbs()`（[shor.html:897-901](../shor.html#L897-L901)）が
+- 掃除: `pruneMyPostThumbs()`（[shor.html:914-918](../shor.html#L914-L918)）が
   起動時に`STORAGE_EXPIRE_MS`（30日）より古いエントリを削除する。
   `cleanupOldPosts()`（サーバ側の投稿本体の掃除）とは別関数だが、
   同じ期限・同じタイミング（起動時）で走らせている
 - 読み出し: `renderHome()`が起動の度に`shor:myPosts`を読み、まだ結果を
   見せていない前日以前の投稿について`getResultForPost(postId)`
-  （[shor.html:959-965](../shor.html#L959-L965)）で`view_history`の
+  （[shor.html:976-982](../shor.html#L976-L982)）で`view_history`の
   `viewed_seconds`合計を取得する。詳細は[screens.md](screens.md)の
   「結果モーダル」節を参照
 
@@ -66,7 +66,7 @@ Safari標準UIが表示され、フルスクリーンのネイティブアプリ
 
 | カラム | 型 | 備考 |
 |---|---|---|
-| `id` | uuid (PK) | クライアントが`genUUID()`（[shor.html:834-841](../shor.html#L834-L841)）で生成し、以後永続化する匿名ID |
+| `id` | uuid (PK) | クライアントが`genUUID()`（[shor.html:851-858](../shor.html#L851-L858)）で生成し、以後永続化する匿名ID |
 | `last_active_at` | timestamptz | `initUser()`が起動の度にupsertする |
 | `has_posted_ever` | boolean | 初投稿判定用。トリガーが自動更新（後述） |
 
@@ -124,11 +124,11 @@ posts 1 ──< view_history (post_id)    -- 1投稿を複数人が閲覧でき�
 ## Storage
 
 バケット名: `photos`（公開バケット）。ファイル名は`genUUID()+".jpg"`
-（[shor.html:906](../shor.html#L906)）。`genUUID()`は`crypto.randomUUID()`が
+（[shor.html:923](../shor.html#L923)）。`genUUID()`は`crypto.randomUUID()`が
 使えればそれを使い、使えない場合（`http:`のLAN IPなど非セキュアコンテキスト。
 セキュアコンテキストは`https:`または`localhost`のみで、`crypto.randomUUID`は
 そこでしか実装されていない）は`crypto.getRandomValues()`から自前でUUID v4を
-組み立てるフォールバックに切り替える（[shor.html:834-841](../shor.html#L834-L841)）。
+組み立てるフォールバックに切り替える（[shor.html:851-858](../shor.html#L851-L858)）。
 `posts.image_url`にはパスではなく
 `.../storage/v1/object/public/photos/<uuid>.jpg`という完全なURLをそのまま
 保存している。そのため画像ファイル名から`posts`行を逆引きする処理
@@ -144,16 +144,16 @@ posts 1 ──< view_history (post_id)    -- 1投稿を複数人が閲覧でき�
 変更してある。スクリーンショットはOS標準でPNG形式で保存され、カメラ写真は
 基本的にJPEG/HEICでPNGにはならない、という前提を利用している。
 
-- `isPng(buffer)`（[shor.html:1614-1620](../shor.html#L1614-L1620)）
+- `isPng(buffer)`（[shor.html:1631-1637](../shor.html#L1631-L1637)）
   PNGのシグネチャ（先頭8バイト）を見るだけの単純な判定。EXIF解析はしない。
-- `handlePickedFile(file, fromCamera)`（[shor.html:1498-1513](../shor.html#L1498-L1513)）
+- `handlePickedFile(file, fromCamera)`（[shor.html:1515-1530](../shor.html#L1515-L1530)）
   - `fromCamera=true`（`camera-input`、`capture="environment"`経由。
     Androidの自前モーダルからのみ発生）: 撮ったばかりの写真は定義上
     カメラ写真なので、中身の判定を丸ごとスキップして無条件で受け付ける
   - `fromCamera=false`（iOSは後述の理由で常にこちら。Androidはギャラリー
     経由）: `isPng()`が`true`を返したら`showPickError()`で弾く
 - **iOS**: `btn-pick`「＋ 写真を選ぶ」を押すと自前モーダルを挟まず
-  `file-input`を直接開く（[shor.html:1465-1479](../shor.html#L1465-L1479)、
+  `file-input`を直接開く（[shor.html:1482-1496](../shor.html#L1482-L1496)、
   `isIOS()`で判定）。iOS Safariは`accept="image/*"`のinputをタップすると
   OS標準で「写真を撮る/ライブラリ/ファイル」のアクションシートを出すため、
   自前モーダルを重ねると選択が二重になってしまう。この一本化により、

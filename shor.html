@@ -574,6 +574,21 @@ footer a{color:inherit;text-decoration:none;border-bottom:1px solid rgba(207,201
   text-shadow:0 1px 12px rgba(20,22,26,.6)} /* 背景に埋もれず読めるよう、ごく淡い陰 */
 #whisper.show{opacity:1}
 
+/* PWAをホーム画面から開いた場合、OSが前回のページをネットワークに問い合わせず
+   そのまま復元することがあり、デプロイ済みの新しいコードが端末に反映されない
+   ことがある。フォアグラウンド復帰のたびcheckForUpdate()がサーバの最終更新
+   日時を無キャッシュで問い合わせ、食い違っていればこのバナーを出す。
+   タップでlocation.reload()するだけで、自動リロードはしない（投稿の長文入力中や
+   現像の長押し中に不意にリロードされると作業が消えるため） */
+#update-banner{position:fixed;top:0;left:0;right:0;z-index:9;
+  padding:calc(11px + env(safe-area-inset-top)) 16px 11px;
+  border:none;border-bottom:1px solid rgba(45,36,26,.12);
+  background:var(--paper);color:var(--ink-charcoal);
+  font:inherit;font-size:10.5px;font-weight:400;letter-spacing:.14em;text-align:center;
+  transform:translateY(-100%);transition:transform 500ms ease;
+}
+#update-banner.show{transform:translateY(0)}
+
 /* 前日投稿の結果ポップアップ */
 .modal[hidden]{display:none}   /* hidden時は確実に非表示（display:flexの上書き防止） */
 .modal{position:fixed;inset:0;z-index:10;display:flex;align-items:center;justify-content:center;
@@ -778,6 +793,8 @@ footer a{color:inherit;text-decoration:none;border-bottom:1px solid rgba(207,201
 </div>
 
 <div id="whisper" role="status" aria-live="polite"></div>
+
+<button id="update-banner" type="button" hidden>新しいバージョンがあります。タップして更新</button>
 
 <footer>
   <a href="#" id="link-privacy">プライバシーポリシー</a>　｜　<a href="#" id="link-contact">お問い合わせ</a>
@@ -1711,6 +1728,40 @@ $("btn-pwa").addEventListener("click", async () => {
   if (deferredPrompt){ deferredPrompt.prompt(); await deferredPrompt.userChoice; deferredPrompt = null; }
   else showPwaHelp(pwaFallbackMessage(), 5200);
 });
+
+/* ---- 新しいバージョンの検知 ----
+   PWAをホーム画面から開くと、OSがネットワークに問い合わせず前回読み込んだ
+   ページをそのまま復元することがあり、デプロイ済みの新しいコードが反映
+   されないことがある（service-worker.jsは何もキャッシュしないため、この
+   停滞は「SWのキャッシュ」ではなくOS/ブラウザ側のページ復元によるもの）。
+   document.lastModifiedは現在表示中のHTMLが読み込まれた時点のLast-Modified
+   ヘッダー値。フォアグラウンド復帰のたび、無キャッシュのHEADで自分自身の
+   最新のLast-Modifiedと比較し、サーバの方が新しければバナーを出す。
+   自動リロードはしない（投稿の長文入力中や現像の長押し中に不意にリロード
+   されると作業が消えるため）。タップされて初めてlocation.reload()する。 */
+const updateBanner = $("update-banner");
+let latestKnownModified = new Date(document.lastModified).getTime();
+let updateAvailable = false;
+async function checkForUpdate(){
+  if (updateAvailable) return;
+  try {
+    const res = await fetch(location.href, { method: "HEAD", cache: "no-store" });
+    const header = res.headers.get("Last-Modified");
+    if (!header) return;
+    const serverModified = new Date(header).getTime();
+    if (serverModified > latestKnownModified){
+      updateAvailable = true;
+      updateBanner.hidden = false;
+      void updateBanner.offsetWidth;
+      updateBanner.classList.add("show");
+    }
+  } catch(e) { /* オフライン等は無視。次のフォアグラウンド復帰でまた試す */ }
+}
+updateBanner.addEventListener("click", () => location.reload());
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") checkForUpdate();
+});
+window.addEventListener("pageshow", e => { if (e.persisted) checkForUpdate(); });
 
 /* ============================================================
    起動
