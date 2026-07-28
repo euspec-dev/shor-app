@@ -117,7 +117,7 @@ score = W_UNREACHED * (view_count == 0 ? 1 : 0)     -- まだ誰にも届いて�
 ### 2. `confirm_drift(viewer_id, post_id)` — 現像完了時に確定
 
 `tick()`内で`developed`が`true`になった瞬間
-（[shor.html:1188-1189](../shor.html#L1188-L1189)）に、`confirmDrift()`
+（[shor.html:1198-1199](../shor.html#L1198-L1199)）に、`confirmDrift()`
 （[shor.html:893-898](../shor.html#L893-L898)）から呼ばれる。
 
 1. 1日の視聴上限チェック（[view-grants.md](view-grants.md)参照）。
@@ -135,7 +135,7 @@ score = W_UNREACHED * (view_count == 0 ? 1 : 0)     -- まだ誰にも届いて�
 `confirmDrift()`は非同期のfire-and-forgetで呼ぶが、指を離した際に呼ばれる
 `recordViewHistoryDB()`（`viewed_seconds`の確定更新）より先に予約行の挿入が
 終わっている必要があるため、`release()`は`confirmPromise`
-（[shor.html:1169](../shor.html#L1169), [shor.html:1222](../shor.html#L1222)）
+（[shor.html:1179](../shor.html#L1179), [shor.html:1232](../shor.html#L1232)）
 の完了を待ってから確定更新を行う。UIの画面遷移演出はこの待ち合わせを
 またがない。
 
@@ -172,7 +172,7 @@ score = W_UNREACHED * (view_count == 0 ? 1 : 0)     -- まだ誰にも届いて�
 - ただし「`peek_drift`が候補を返した直後、クライアントに画像URLが渡って
   から実際に読み込むまでの間に画像が削除される」というレースはDBトリガー
   では防げない。この隙間は`openView()`側で`imageLoads()`
-  （[shor.html:1104-1111](../shor.html#L1104-L1111)）が画像を先読みし、
+  （[shor.html:1114-1121](../shor.html#L1114-L1121)）が画像を先読みし、
   失敗したら候補0件のときと同じ「まだ写真が届いていません」表示に
   フォールバックすることでカバーしている（[screens.md](screens.md)参照）。
 
