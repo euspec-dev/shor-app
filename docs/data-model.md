@@ -43,8 +43,8 @@ Safari標準UIが表示され、フルスクリーンのネイティブアプリ
   `Date.now()`（ミリ秒epoch）、`thumb`は長辺240px・JPEG品質0.5の
   サムネイルdataURL
 - 書き込み: `btnSend`のクリックハンドラ内、`createPost()`成功直後
-  （[shor.html:1553-1555](../shor.html#L1553-L1555)）。サムネイルは
-  `makeThumb(finalDataUrl, 240, .5)`（[shor.html:1657-1669](../shor.html#L1657-L1669)）
+  （[shor.html:1563-1565](../shor.html#L1563-L1565)）。サムネイルは
+  `makeThumb(finalDataUrl, 240, .5)`（[shor.html:1667-1679](../shor.html#L1667-L1679)）
   で生成する。`finalDataUrl`は投稿本体のアップロードにも使う
   `cropAdjusted()`（[screens.md](screens.md)の「投稿写真の拡大縮小・移動調整」
   節参照）の出力そのもので、`downscale()`（写真選択直後の縮小用）とは別の
@@ -56,9 +56,11 @@ Safari標準UIが表示され、フルスクリーンのネイティブアプリ
   同じ期限・同じタイミング（起動時）で走らせている
 - 読み出し: `renderHome()`が起動の度に`shor:myPosts`を読み、まだ結果を
   見せていない前日以前の投稿について`getResultForPost(postId)`
-  （[shor.html:976-982](../shor.html#L976-L982)）で`view_history`の
-  `viewed_seconds`合計を取得する。詳細は[screens.md](screens.md)の
-  「結果モーダル」節を参照
+  （[shor.html:983-989](../shor.html#L983-L989)）で`view_history`の
+  `viewed_seconds`合計を取得する。`view_history`に行が無い（＝まだ誰にも
+  見られていない）場合は`null`を返し、結果モーダルには出さず無言で
+  先送りする（`resultConfirmed`フラグも立てない）。詳細は
+  [screens.md](screens.md)の「結果モーダル」節を参照
 
 ## テーブル一覧
 
@@ -144,16 +146,16 @@ posts 1 ──< view_history (post_id)    -- 1投稿を複数人が閲覧でき�
 変更してある。スクリーンショットはOS標準でPNG形式で保存され、カメラ写真は
 基本的にJPEG/HEICでPNGにはならない、という前提を利用している。
 
-- `isPng(buffer)`（[shor.html:1631-1637](../shor.html#L1631-L1637)）
+- `isPng(buffer)`（[shor.html:1641-1647](../shor.html#L1641-L1647)）
   PNGのシグネチャ（先頭8バイト）を見るだけの単純な判定。EXIF解析はしない。
-- `handlePickedFile(file, fromCamera)`（[shor.html:1515-1530](../shor.html#L1515-L1530)）
+- `handlePickedFile(file, fromCamera)`（[shor.html:1525-1540](../shor.html#L1525-L1540)）
   - `fromCamera=true`（`camera-input`、`capture="environment"`経由。
     Androidの自前モーダルからのみ発生）: 撮ったばかりの写真は定義上
     カメラ写真なので、中身の判定を丸ごとスキップして無条件で受け付ける
   - `fromCamera=false`（iOSは後述の理由で常にこちら。Androidはギャラリー
     経由）: `isPng()`が`true`を返したら`showPickError()`で弾く
 - **iOS**: `btn-pick`「＋ 写真を選ぶ」を押すと自前モーダルを挟まず
-  `file-input`を直接開く（[shor.html:1482-1496](../shor.html#L1482-L1496)、
+  `file-input`を直接開く（[shor.html:1492-1506](../shor.html#L1492-L1506)、
   `isIOS()`で判定）。iOS Safariは`accept="image/*"`のinputをタップすると
   OS標準で「写真を撮る/ライブラリ/ファイル」のアクションシートを出すため、
   自前モーダルを重ねると選択が二重になってしまう。この一本化により、

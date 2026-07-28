@@ -966,18 +966,25 @@ async function getResultForDate(dateStr){
     .select("viewed_seconds")
     .in("post_id", postIds);
 
-  if (!views || views.length === 0) return 0;
+  /* view_historyに行が無い＝その日の投稿がまだ誰にも見られていない。
+     0秒として結果を確定させず、nullを返して呼び出し側に先送りさせる
+     （view_historyの行はconfirm_drift内でview_count/is_opened更新と
+     同じUPDATE/INSERTで作られるため、行の有無は両者と常に一致する）。 */
+  if (!views || views.length === 0) return null;
   return Math.round(views.reduce((sum, v) => sum + v.viewed_seconds, 0));
 }
 
 /* 投稿1件単位の結果。同日に複数投稿してもそれぞれ個別に集計できる
    （getResultForDate()は日付単位の合算なので、こちらが投稿単位の後継）。
-   誰にも見られていなければ0を返す（＝投稿は実在するので必ず結果を出す）。 */
+   まだ誰にも見られていなければnullを返す。以前は0を返して「必ず結果を
+   出す」実装だったが、配信期限を撤廃して久しく届かない投稿もあり得る
+   設計にした以上、結果表示側でも「0秒＝流れ着かなかった」というネガティブな
+   状態をユーザーに見せない方針に統一した（呼び出し側で先送りする）。 */
 async function getResultForPost(postId){
   const { data: views } = await db.from("view_history")
     .select("viewed_seconds")
     .eq("post_id", postId);
-  if (!views || views.length === 0) return 0;
+  if (!views || views.length === 0) return null;
   return Math.round(views.reduce((sum, v) => sum + v.viewed_seconds, 0));
 }
 
@@ -1054,13 +1061,16 @@ async function renderHome(){
   }
 
   /* 投稿1件ごとの結果（サムネイル付き）。前日以前に投稿したもののうち、
-     まだ結果を見せていないものを古い順に集める */
+     まだ結果を見せていないものを古い順に集める。まだ誰にも見られていない
+     投稿（getResultForPost()がnullを返す）は無言で先送りし、resultConfirmed
+     フラグも立てない（次回以降のrenderHome()で再度チェックされる） */
   const myPosts = store.get("myPosts", []);
   for (const p of myPosts){
     if (appDayStr(p.createdAt) >= today) continue;
     const key = "resultConfirmed:post:" + p.id;
     if (store.get(key, false)) continue;
     const seconds = await getResultForPost(p.id);
+    if (seconds === null) continue;
     pendingResults.push({ postId: p.id, seconds, thumb: p.thumb || null });
   }
 }
