@@ -23,7 +23,7 @@ scr-view画面で、ブラウザ写真のポラロイドを「現像」するた
 
 ## 押している間: `tick(now)`
 
-`DEVELOP_MS = 5000`（[shor.html:890](../shor.html#L890)）で正規化した
+`DEVELOP_MS = 5000`（[shor.html:893](../shor.html#L893)）で正規化した
 進捗`t`（0〜1）から、`e = 1 - (1-t)^2`という減速イージングを作り、
 写真のぼかしと粒度を滑らかに解いていく（[shor.html:1319-1334](../shor.html#L1319-L1334)）。
 
@@ -40,7 +40,7 @@ frost透明度: 1   → 0            (1 - e)
 - 現像完了ラベルの表示切り替え、「指を離すと、この一枚は流れていきます」
   という案内を表示
 
-案内文（`#under-note`）は`min-height:3.9em`（[shor.html:513](../shor.html#L513)）を
+案内文（`#under-note`）は`min-height:3.9em`（[shor.html:521](../shor.html#L521)）を
 持たせてあり、表示/非表示で本文の高さが変わらないようにしている。この文言は
 `<br>`で強制的に2行になるため、以前`min-height`が2行分に足りておらず、
 文言が出た瞬間にscr-view全体の位置がわずかにずれるバグがあった（修正済み）。
@@ -90,7 +90,7 @@ frost透明度: 1   → 0            (1 - e)
 `shor.html`全体で長押しメニュー・選択・ドラッグ保存を無効化している。
 CSS側（[shor.html:59-68](../shor.html#L59-L68)）で
 `user-select`/`touch-callout`/`user-drag`等を`none`にし、その上でJS側
-（[shor.html:1083-1084](../shor.html#L1083-L1084)、`contextmenu`/`selectstart`/
+（[shor.html:1086-1087](../shor.html#L1086-L1087)、`contextmenu`/`selectstart`/
 `dragstart`の`preventDefault`）が「最終防衛線」として二重に無効化している。
 これは現像ゾーンの長押しがOS標準のコンテキストメニューやテキスト選択と
 衝突しないようにするための、アプリ全体にかかる前提。

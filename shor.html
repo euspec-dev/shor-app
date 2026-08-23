@@ -126,10 +126,9 @@ p.passage + p.passage{margin-top:2.4em}
 .small{font-size:10px;font-weight:300;color:var(--ink-faint);letter-spacing:.2em}
 .em{color:#f4f0e7}
 
-/* 投稿画面・閲覧画面・ホーム画面それぞれのポラロイド外側・上に置く
-   「その日のテーマ」表示。既存のポラロイド関連クラス（.polaroid等）とは
-   独立させ、新規クラスのみで組む。ホーム版だけ.theme-labelを2つ（日付＋
-   「今日のテーマ」）重ねて使う */
+/* 投稿画面・閲覧画面のポラロイド外側・上に置く「その日のテーマ」表示。
+   ホーム画面には出さない（撤去済み）。既存のポラロイド関連クラス
+   （.polaroid等）とは独立させ、新規クラスのみで組む */
 .theme-note{text-align:center;margin-bottom:1.8em}
 .theme-note[hidden]{display:none}
 .theme-note .theme-label{font-size:9px;font-weight:300;letter-spacing:.24em;color:var(--ink-faint)}
@@ -137,23 +136,32 @@ p.passage + p.passage{margin-top:2.4em}
   letter-spacing:.3em;text-indent:.3em;color:var(--ink-mist)}
 
 /* ホーム画面の状態分岐（#home-a／#btn-see／#home-notice は互いに排他的に
-   表示する。切り替えはrenderHome()が担う）。
-   #btn-seeは「届いた一通を見る」ボタンを兼ねる（統合済み）。myPosts空の
-   ときは非表示、canView()がtrueなら文言「1通、流れ着いています」＋
-   クリック可、falseなら「次の一通は、明日の朝に」＋disabled */
+   表示する。切り替えはrenderHome()が担う）。並び順は
+   #home-a → #home-to-post（主ボタン、常時） → #home-notice（しらせ帯） →
+   #btn-see。#btn-seeは「届いた一通を見る」ボタンを兼ねる（統合済み）。
+   myPosts空のときは非表示、canView()がtrueなら文言「1通、流れ着いています」
+   ＋クリック可、falseなら「次の一通は、明日の朝に」＋disabled */
 .home-status{appearance:none;background:transparent;border:none;cursor:pointer;
   font:inherit;color:var(--ink-mist);font-size:12px;font-weight:400;
-  letter-spacing:.18em;padding:0;margin-bottom:1.8em;text-align:center;
+  letter-spacing:.18em;text-indent:.18em;padding:0;margin-top:1.8em;text-align:center;
   transition:opacity .4s ease}
 .home-status:disabled{cursor:default;color:var(--ink-faint)}
 /* しらせ帯（未確認の結果があるときだけ表示）。サムネイルは重なり表示で
    最大3件、それ以上は積んでもサムネイルを増やさない（件数はテキスト側で
-   表現しない仕様のため、4件目以降があっても見た目は3件のまま） */
+   表現しない仕様のため、4件目以降があっても見た目は3件のまま）。
+   点滅ではなく、透明度がゆっくり上下する「呼吸」のようなアニメーションで
+   目立たせる（世界観に合わせ、急激な変化は避ける）。非表示中（hidden→
+   display:none）はアニメーションも走らない */
 .notice-strip{display:flex;align-items:center;justify-content:center;gap:10px;
-  cursor:pointer;margin-bottom:1.8em;padding:9px 16px;
+  cursor:pointer;margin-top:1.8em;padding:9px 16px;
   border:1px solid rgba(236,231,220,.18);border-radius:2px;
-  background:rgba(236,231,220,.05);transition:background-color .4s ease}
+  background:rgba(236,231,220,.05);transition:background-color .4s ease;
+  animation:noticeStripPulse 2.6s ease-in-out infinite}
 .notice-strip:hover{background:rgba(236,231,220,.1)}
+@keyframes noticeStripPulse{
+  0%, 100%{opacity:.55}
+  50%{opacity:1}
+}
 .notice-strip-thumbs{display:flex}
 .notice-strip-thumbs .thumb{width:24px;height:24px;border-radius:50%;
   background-size:cover;background-position:center;background-color:rgba(236,231,220,.15);
@@ -520,7 +528,7 @@ footer a{color:inherit;text-decoration:none;border-bottom:1px solid rgba(207,201
 /* 控えめな「TOPへ戻る」リンク（中断用）。フッターと干渉しないよう下端から少し上に置く */
 .to-top{margin-top:auto;padding-top:30px;margin-bottom:6px;
   appearance:none;background:transparent;border:none;cursor:pointer;
-  font:inherit;font-size:9.5px;font-weight:300;letter-spacing:.24em;color:var(--ink-faint);
+  font:inherit;font-size:9.5px;font-weight:300;letter-spacing:.24em;text-indent:.24em;color:var(--ink-faint);
   transition:color .5s ease}
 .to-top:hover{color:var(--ink-mist)}
 
@@ -607,7 +615,7 @@ footer a{color:inherit;text-decoration:none;border-bottom:1px solid rgba(207,201
 #devbar{position:fixed;top:calc(8px + env(safe-area-inset-top));right:10px;z-index:9;
   display:flex;gap:14px}
 #devbar button{appearance:none;background:transparent;border:none;cursor:pointer;
-  font:inherit;font-size:9px;font-weight:300;letter-spacing:.18em;
+  font:inherit;font-size:9px;font-weight:300;letter-spacing:.18em;text-indent:.18em;
   color:var(--ink-faint);opacity:.65;padding:6px 2px;
   border-bottom:1px dotted rgba(196,206,216,.4)}
 #devbar button:hover{opacity:1}
@@ -687,22 +695,17 @@ footer a{color:inherit;text-decoration:none;border-bottom:1px solid rgba(207,201
 
   <!-- ============ 画面1: ダッシュボード ============ -->
   <section class="screen" id="scr-home" aria-label="ホーム">
-    <div class="theme-note" id="home-theme">
-      <p class="theme-label" id="home-theme-date"></p>
-      <p class="theme-label">今日のテーマ</p>
-      <p class="theme-text" id="home-theme-text"></p>
-    </div>
     <div id="home-a" hidden>
       <p class="passage">見せるほどじゃない。でも、伝えたい。</p>
       <p class="passage">その一枚を、ボトルメールのように<br>知らない誰かへ流せます。</p>
       <p class="passage">いいねも、フォロワーもありません。</p>
     </div>
-    <button class="home-status" id="btn-see" hidden></button>
+    <button class="btn" id="home-to-post" type="button" style="margin-top:1.8em;padding-top:0">写真を流す</button>
     <div class="notice-strip" id="home-notice" hidden>
       <div class="notice-strip-thumbs" id="home-notice-thumbs"></div>
       <span>しらせが届いています</span>
     </div>
-    <button class="btn" id="home-to-post" type="button" style="margin-top:1.8em;padding-top:0">写真を流す</button>
+    <button class="home-status" id="btn-see" hidden></button>
   </section>
 
   <!-- ============ 画面2: 閲覧（現像） ============ -->
@@ -1135,9 +1138,6 @@ async function renderHome(){
   show("scr-home");
 
   const today = appDayStr();
-  const [, mm, dd] = today.split("-").map(s => parseInt(s, 10));
-  $("home-theme-date").textContent = `${mm}月${dd}日`;
-  $("home-theme-text").textContent = `「${themeFor(today)}」`;
 
   pendingResults = [];
 

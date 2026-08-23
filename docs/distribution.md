@@ -86,7 +86,7 @@ update distribution_config set k_default = 4;
 
 ### 1. `peek_drift(viewer_id)` — 候補を選ぶだけ（副作用なし）
 
-写真を開いた瞬間、`getRandomDrift()`（[shor.html:974-978](../shor.html#L974-L978)）
+写真を開いた瞬間、`getRandomDrift()`（[shor.html:977-981](../shor.html#L977-L981)）
 から呼ばれる。以下の**足切り**を満たす投稿だけを候補にする。
 
 1. `status = 'active'`
@@ -119,7 +119,7 @@ random() limit 1`）で並べ、先頭の1件を返す。まだ誰にも見ら�
 
 `tick()`内で`developed`が`true`になった瞬間
 （[shor.html:1325-1326](../shor.html#L1325-L1326)）に、`confirmDrift()`
-（[shor.html:983-988](../shor.html#L983-L988)）から呼ばれる。
+（[shor.html:986-991](../shor.html#L986-L991)）から呼ばれる。
 
 1. 1日の視聴上限チェック（[view-grants.md](view-grants.md)参照）。
    上限到達なら`false`を返す。
@@ -131,7 +131,7 @@ random() limit 1`）で並べ、先頭の1件を返す。まだ誰にも見ら�
 
 競合で`confirm_drift`が`false`を返すことは稀にあるが、その場合も
 クライアントは体験上そのまま鑑賞を継続させ、サーバ側の集計に反映されない
-だけの扱いとする（[shor.html:980-982](../shor.html#L980-L982)のコメント参照）。
+だけの扱いとする（[shor.html:983-985](../shor.html#L983-L985)のコメント参照）。
 
 `confirmDrift()`は非同期のfire-and-forgetで呼ぶが、指を離した際に呼ばれる
 `recordViewHistoryDB()`（`viewed_seconds`の確定更新）より先に予約行の挿入が
