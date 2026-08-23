@@ -2,7 +2,7 @@
 
 Supabase (Postgres + Storage) 上の実体。認証は無く、匿名UUID
 （`localStorage`の`shor:uid`）がそのままユーザーIDとして使われる
-（[shor.html:937-950](../shor.html#L937-L950)）。
+（[shor.html:940-953](../shor.html#L940-L953)）。
 
 ### なぜiOSだけ別のmanifestを使うのか
 
@@ -50,13 +50,13 @@ Safari標準UIが表示され、フルスクリーンのネイティブアプリ
   節参照）の出力そのもので、`downscale()`（写真選択直後の縮小用）とは別の
   軽量版。既にJPEG化済みのdataURLを再度縮小するだけなのでFile/Blobを
   経由しない
-- 掃除: `pruneMyPostThumbs()`（[shor.html:1004-1008](../shor.html#L1004-L1008)）が
+- 掃除: `pruneMyPostThumbs()`（[shor.html:1007-1011](../shor.html#L1007-L1011)）が
   起動時に`STORAGE_EXPIRE_MS`（30日）より古いエントリを削除する。
   `cleanupOldPosts()`（サーバ側の投稿本体の掃除）とは別関数だが、
   同じ期限・同じタイミング（起動時）で走らせている
 - 読み出し: `renderHome()`が起動の度に`shor:myPosts`を読み、まだ結果を
   見せていない前日以前の投稿について`getResultForPost(postId)`
-  （[shor.html:1074-1080](../shor.html#L1074-L1080)）で`view_history`の
+  （[shor.html:1077-1083](../shor.html#L1077-L1083)）で`view_history`の
   `viewed_seconds`合計を取得する。`view_history`に行が無い（＝まだ誰にも
   見られていない）場合は`null`を返し、結果モーダルには出さず無言で
   先送りする（`resultConfirmed`フラグも立てない）。詳細は
@@ -68,7 +68,7 @@ Safari標準UIが表示され、フルスクリーンのネイティブアプリ
 
 | カラム | 型 | 備考 |
 |---|---|---|
-| `id` | uuid (PK) | クライアントが`genUUID()`（[shor.html:941-948](../shor.html#L941-L948)）で生成し、以後永続化する匿名ID |
+| `id` | uuid (PK) | クライアントが`genUUID()`（[shor.html:944-951](../shor.html#L944-L951)）で生成し、以後永続化する匿名ID |
 | `last_active_at` | timestamptz | `initUser()`が起動の度にupsertする |
 | `has_posted_ever` | boolean | 初投稿判定用。トリガーが自動更新（後述） |
 
@@ -103,12 +103,12 @@ Safari標準UIが表示され、フルスクリーンのネイティブアプリ
 投稿画面・閲覧画面それぞれに、その投稿の日の「テーマ」を表示する
 （[screens.md](screens.md)参照）。仕様は次の通り。
 
-- `THEMES`（[shor.html:915-924](../shor.html#L915-L924)）: 30個の固定文言の
+- `THEMES`（[shor.html:918-927](../shor.html#L918-L927)）: 30個の固定文言の
   配列。**並び順を変更・削除しないこと** — 既に投稿済みの`posts.theme`は
   文字列としてそのまま保存されるため実は並び替えても過去分には影響しないが、
   `themeFor()`が将来の同じ暦日に対して常に同じテーマを返し続けるためには
   順序を保つ必要がある（末尾への追加は安全）
-- `themeFor(dayStr = appDayStr())`（[shor.html:927-930](../shor.html#L927-L930)）:
+- `themeFor(dayStr = appDayStr())`（[shor.html:930-933](../shor.html#L930-L933)）:
   `dayStr`をUTC日付として解釈し、エポックからの通算日数を`THEMES.length`
   （30）で割った余りを添字にする純関数。同じ暦日を渡せば常に同じテーマを返す
 - 投稿時、`createPost()`が`themeFor()`（引数省略＝今日）の結果を`theme`
@@ -151,11 +151,11 @@ posts 1 ──< view_history (post_id)    -- 1投稿を複数人が閲覧でき�
 ## Storage
 
 バケット名: `photos`（公開バケット）。ファイル名は`genUUID()+".jpg"`
-（[shor.html:1013](../shor.html#L1013)）。`genUUID()`は`crypto.randomUUID()`が
+（[shor.html:1016](../shor.html#L1016)）。`genUUID()`は`crypto.randomUUID()`が
 使えればそれを使い、使えない場合（`http:`のLAN IPなど非セキュアコンテキスト。
 セキュアコンテキストは`https:`または`localhost`のみで、`crypto.randomUUID`は
 そこでしか実装されていない）は`crypto.getRandomValues()`から自前でUUID v4を
-組み立てるフォールバックに切り替える（[shor.html:941-948](../shor.html#L941-L948)）。
+組み立てるフォールバックに切り替える（[shor.html:944-951](../shor.html#L944-L951)）。
 `posts.image_url`にはパスではなく
 `.../storage/v1/object/public/photos/<uuid>.jpg`という完全なURLをそのまま
 保存している。そのため画像ファイル名から`posts`行を逆引きする処理
