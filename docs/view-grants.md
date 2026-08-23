@@ -19,21 +19,21 @@
 
 ## クライアント側の実装（localStorage）
 
-- `freeUsedToday()` / `useFreeGrant()` （[shor.html:1106-1107](../shor.html#L1106-L1107)）
+- `freeUsedToday()` / `useFreeGrant()` （[shor.html:1107-1108](../shor.html#L1107-L1108)）
   `localStorage` の `shor:viewFreeUsed` に「無料枠を使った日付（`appDayStr()`、
   後述）」を保存する。値が今日の`appDayStr()`と一致していれば「今日はもう
   無料枠を使った」と判定する。
 - `postGrants()` / `addPostGrant()` / `consumePostGrant()`
-  （[shor.html:1109-1122](../shor.html#L1109-L1122)）
+  （[shor.html:1110-1123](../shor.html#L1110-L1123)）
   `localStorage` の `shor:postGrants` に `{date, count, granted}`
   （`date`は`appDayStr()`）を保存する。`addPostGrant()` は投稿成功時
-  （[shor.html:1713](../shor.html#L1713)、`createPost` 成功直後）に呼ばれる
+  （[shor.html:1714](../shor.html#L1714)、`createPost` 成功直後）に呼ばれる
   が、その日すでに `granted:true` なら何もしない — **同じ日に何通投稿しても、
   投稿ボーナスは+1しか増えない。**
-- `canView()` （[shor.html:1123](../shor.html#L1123)）
+- `canView()` （[shor.html:1124](../shor.html#L1124)）
   `!freeUsedToday() || postGrants() > 0`。無料枠が未消費、または投稿枠の残数が
   あれば閲覧可能。ボタンを押せるかどうかの入り口の判定にのみ使う。
-- `consumeView()` （[shor.html:1124-1127](../shor.html#L1124-L1127)）
+- `consumeView()` （[shor.html:1125-1128](../shor.html#L1125-L1128)）
   無料枠が未消費ならまず無料枠を消費し、消費済みなら投稿枠を1つ消費する。
   **無料枠が優先的に消費される。**
 
@@ -41,7 +41,7 @@
 
 `consumeView()` は「届いた一通を見る」を押した時点（＝画面を開いた時点）
 ではなく、**現像インタラクションが完了した瞬間**に呼ばれる
-（[shor.html:1325-1326](../shor.html#L1325-L1326)、`tick()` 内で
+（[shor.html:1326-1327](../shor.html#L1326-L1327)、`tick()` 内で
 `developed` が `true` になる箇所）。
 
 写真を開いただけで長押しをやめて離脱した場合は枠を消費しない。実際に
@@ -53,12 +53,12 @@
 2つのRPCに分けてある。
 
 1. **`peek_drift(viewer_id)`** （候補を選ぶだけ、副作用なし）
-   写真を開いた瞬間 `getRandomDrift()`（[shor.html:1262](../shor.html#L1262)）
+   写真を開いた瞬間 `getRandomDrift()`（[shor.html:1263](../shor.html#L1263)）
    から呼ばれる。加重ランダムで候補を選んで返すだけで、`view_count` の増分も
    `view_history` への記録も一切行わない。何度呼んでも状態は変わらない。
 2. **`confirm_drift(viewer_id, post_id)`** （現像完了時に呼ぶ、ここで確定）
-   `confirmDrift()`（[shor.html:986-991](../shor.html#L986-L991)）から、
-   `tick()` 内で `developed` が `true` になった瞬間（[shor.html:1326](../shor.html#L1326)）
+   `confirmDrift()`（[shor.html:987-992](../shor.html#L987-L992)）から、
+   `tick()` 内で `developed` が `true` になった瞬間（[shor.html:1327](../shor.html#L1327)）
    に呼ばれる。ここで初めて:
    - 1日の視聴上限チェック（後述）
    - 対象投稿がまだ有効か（`peek` から時間が経っている間に上限到達/期限切れ/
@@ -73,7 +73,7 @@
 confirmDrift() の呼び出しは非同期（fire-and-forget）だが、現像完了直後に
 指を離した際に呼ばれる `recordViewHistoryDB()`（`viewed_seconds` の確定更新）
 より先に `view_history` の予約行が挿入されている必要があるため、
-`release()`（[shor.html:1359-1363](../shor.html#L1359-L1363)）は
+`release()`（[shor.html:1360-1364](../shor.html#L1360-L1364)）は
 `confirmDrift()` の完了を待ってから `recordViewHistoryDB()` を呼ぶよう
 順序を保証している。UI側の画面遷移（washed演出など）はこの待ち合わせを
 またずに即座に始まる。
@@ -91,18 +91,18 @@ peek/confirmに分離し、どちらも「現像完了」という同じ瞬間�
 
 ### リセットのタイミング: 深夜0時ではなく朝7時
 
-`appDayStr()` （[shor.html:904-907](../shor.html#L904-L907)）が「アプリ内の
+`appDayStr()` （[shor.html:905-908](../shor.html#L905-L908)）が「アプリ内の
 1日」の文字列を作る。**現在時刻から7時間引いた時点の日付**をその日として
 扱う実装（`APP_DAY_SHIFT_MS = 7 * 60 * 60 * 1000`）で、端末の**ローカル
 時刻**基準。つまり無料枠・投稿枠のリセットは「ローカル時間の朝7時」を境に
 起こり、深夜0時〜6時59分はまだ前日として扱われる。`appYesterdayStr()`
-（[shor.html:908-912](../shor.html#L908-L912)）は同じ区切りでの前日を返す。
+（[shor.html:909-913](../shor.html#L909-L913)）は同じ区切りでの前日を返す。
 
 以前は`todayStr()`（深夜0時区切り）を使っていたが、「1日の区切りが深夜0時
 だと、寝る前・寝起きの生活リズムと合わない」という理由で朝7時区切りに変更した。
 `freeUsedToday`/`postGrants`系の関数（`appDayStr()`を直接使う）だけでなく、
-`renderHome()`の前日結果判定（[shor.html:1148](../shor.html#L1148)）・
-`getResultForDate()`の集計期間（[shor.html:1042-1066](../shor.html#L1042-L1066)、
+`renderHome()`の前日結果判定（[shor.html:1149](../shor.html#L1149)）・
+`getResultForDate()`の集計期間（[shor.html:1043-1067](../shor.html#L1043-L1067)、
 後述）・devbar（`dev-yesterday`/`dev-skip`）まで、**日付境界に関わる箇所は
 全て`appDayStr()`/`appYesterdayStr()`に統一**してある。
 
@@ -118,13 +118,13 @@ peek/confirmに分離し、どちらも「現像完了」という同じ瞬間�
 `canView() === false` のときの扱いは、画面によって異なる（[screens.md](screens.md)の
 「ホーム画面の状態分岐」参照）。
 
-- **ホーム画面**（`#btn-see`、[shor.html:1170-1187](../shor.html#L1170-L1187)）:
+- **ホーム画面**（`#btn-see`、[shor.html:1171-1188](../shor.html#L1171-L1188)）:
   `renderHome()`が状態を見て`disabled`属性と文言を宣言的に切り替える。
   モーダルは出さず、ボタン自体が「次の一通は、明日の朝に」という無効化
   表示になる。以前あった「投稿済みかどうかで文言を変える」分岐は廃止した
   （`postGrants`の`granted`有無を見ずに、`canView()`の真偽だけで決まる）
 - **投稿完了画面**「届いた一通を見る」（`#btn-give2see`、
-  [shor.html:1841-1847](../shor.html#L1841-L1847)）: こちらは変更なし。
+  [shor.html:1842-1848](../shor.html#L1842-L1848)）: こちらは変更なし。
   クリック時に`canView()`を判定し、`false`なら`notice-modal`で
   「今日のボトルメールは以上です　朝7時に、次の一通が流れ着きます」と表示する
 
