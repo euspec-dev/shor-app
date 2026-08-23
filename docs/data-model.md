@@ -2,7 +2,7 @@
 
 Supabase (Postgres + Storage) 上の実体。認証は無く、匿名UUID
 （`localStorage`の`shor:uid`）がそのままユーザーIDとして使われる
-（[shor.html:940-953](../shor.html#L940-L953)）。
+（[shor.html:941-954](../shor.html#L941-L954)）。
 
 ### なぜiOSだけ別のmanifestを使うのか
 
@@ -43,20 +43,20 @@ Safari標準UIが表示され、フルスクリーンのネイティブアプリ
   `Date.now()`（ミリ秒epoch）、`thumb`は長辺240px・JPEG品質0.5の
   サムネイルdataURL
 - 書き込み: `btnSend`のクリックハンドラ内、`createPost()`成功直後
-  （[shor.html:1710-1712](../shor.html#L1710-L1712)）。サムネイルは
-  `makeThumb(finalDataUrl, 240, .5)`（[shor.html:1814-1826](../shor.html#L1814-L1826)）
+  （[shor.html:1711-1713](../shor.html#L1711-L1713)）。サムネイルは
+  `makeThumb(finalDataUrl, 240, .5)`（[shor.html:1815-1827](../shor.html#L1815-L1827)）
   で生成する。`finalDataUrl`は投稿本体のアップロードにも使う
   `cropAdjusted()`（[screens.md](screens.md)の「投稿写真の拡大縮小・移動調整」
   節参照）の出力そのもので、`downscale()`（写真選択直後の縮小用）とは別の
   軽量版。既にJPEG化済みのdataURLを再度縮小するだけなのでFile/Blobを
   経由しない
-- 掃除: `pruneMyPostThumbs()`（[shor.html:1007-1011](../shor.html#L1007-L1011)）が
+- 掃除: `pruneMyPostThumbs()`（[shor.html:1008-1012](../shor.html#L1008-L1012)）が
   起動時に`STORAGE_EXPIRE_MS`（30日）より古いエントリを削除する。
   `cleanupOldPosts()`（サーバ側の投稿本体の掃除）とは別関数だが、
   同じ期限・同じタイミング（起動時）で走らせている
 - 読み出し: `renderHome()`が起動の度に`shor:myPosts`を読み、まだ結果を
   見せていない前日以前の投稿について`getResultForPost(postId)`
-  （[shor.html:1077-1083](../shor.html#L1077-L1083)）で`view_history`の
+  （[shor.html:1078-1084](../shor.html#L1078-L1084)）で`view_history`の
   `viewed_seconds`合計を取得する。`view_history`に行が無い（＝まだ誰にも
   見られていない）場合は`null`を返し、結果モーダルには出さず無言で
   先送りする（`resultConfirmed`フラグも立てない）。詳細は
@@ -68,7 +68,7 @@ Safari標準UIが表示され、フルスクリーンのネイティブアプリ
 
 | カラム | 型 | 備考 |
 |---|---|---|
-| `id` | uuid (PK) | クライアントが`genUUID()`（[shor.html:944-951](../shor.html#L944-L951)）で生成し、以後永続化する匿名ID |
+| `id` | uuid (PK) | クライアントが`genUUID()`（[shor.html:945-952](../shor.html#L945-L952)）で生成し、以後永続化する匿名ID |
 | `last_active_at` | timestamptz | `initUser()`が起動の度にupsertする |
 | `has_posted_ever` | boolean | 初投稿判定用。トリガーが自動更新（後述） |
 
@@ -103,12 +103,12 @@ Safari標準UIが表示され、フルスクリーンのネイティブアプリ
 投稿画面・閲覧画面それぞれに、その投稿の日の「テーマ」を表示する
 （[screens.md](screens.md)参照）。仕様は次の通り。
 
-- `THEMES`（[shor.html:918-927](../shor.html#L918-L927)）: 30個の固定文言の
+- `THEMES`（[shor.html:919-928](../shor.html#L919-L928)）: 30個の固定文言の
   配列。**並び順を変更・削除しないこと** — 既に投稿済みの`posts.theme`は
   文字列としてそのまま保存されるため実は並び替えても過去分には影響しないが、
   `themeFor()`が将来の同じ暦日に対して常に同じテーマを返し続けるためには
   順序を保つ必要がある（末尾への追加は安全）
-- `themeFor(dayStr = appDayStr())`（[shor.html:930-933](../shor.html#L930-L933)）:
+- `themeFor(dayStr = appDayStr())`（[shor.html:931-934](../shor.html#L931-L934)）:
   `dayStr`をUTC日付として解釈し、エポックからの通算日数を`THEMES.length`
   （30）で割った余りを添字にする純関数。同じ暦日を渡せば常に同じテーマを返す
 - 投稿時、`createPost()`が`themeFor()`（引数省略＝今日）の結果を`theme`
@@ -151,11 +151,11 @@ posts 1 ──< view_history (post_id)    -- 1投稿を複数人が閲覧でき�
 ## Storage
 
 バケット名: `photos`（公開バケット）。ファイル名は`genUUID()+".jpg"`
-（[shor.html:1016](../shor.html#L1016)）。`genUUID()`は`crypto.randomUUID()`が
+（[shor.html:1017](../shor.html#L1017)）。`genUUID()`は`crypto.randomUUID()`が
 使えればそれを使い、使えない場合（`http:`のLAN IPなど非セキュアコンテキスト。
 セキュアコンテキストは`https:`または`localhost`のみで、`crypto.randomUUID`は
 そこでしか実装されていない）は`crypto.getRandomValues()`から自前でUUID v4を
-組み立てるフォールバックに切り替える（[shor.html:944-951](../shor.html#L944-L951)）。
+組み立てるフォールバックに切り替える（[shor.html:945-952](../shor.html#L945-L952)）。
 `posts.image_url`にはパスではなく
 `.../storage/v1/object/public/photos/<uuid>.jpg`という完全なURLをそのまま
 保存している。そのため画像ファイル名から`posts`行を逆引きする処理
@@ -171,16 +171,16 @@ posts 1 ──< view_history (post_id)    -- 1投稿を複数人が閲覧でき�
 変更してある。スクリーンショットはOS標準でPNG形式で保存され、カメラ写真は
 基本的にJPEG/HEICでPNGにはならない、という前提を利用している。
 
-- `isPng(buffer)`（[shor.html:1788-1794](../shor.html#L1788-L1794)）
+- `isPng(buffer)`（[shor.html:1789-1795](../shor.html#L1789-L1795)）
   PNGのシグネチャ（先頭8バイト）を見るだけの単純な判定。EXIF解析はしない。
-- `handlePickedFile(file, fromCamera)`（[shor.html:1671-1687](../shor.html#L1671-L1687)）
+- `handlePickedFile(file, fromCamera)`（[shor.html:1672-1688](../shor.html#L1672-L1688)）
   - `fromCamera=true`（`camera-input`、`capture="environment"`経由。
     Androidの自前モーダルからのみ発生）: 撮ったばかりの写真は定義上
     カメラ写真なので、中身の判定を丸ごとスキップして無条件で受け付ける
   - `fromCamera=false`（iOSは後述の理由で常にこちら。Androidはギャラリー
     経由）: `isPng()`が`true`を返したら`showPickError()`で弾く
 - **iOS**: `btn-pick`「＋ 写真を選ぶ」を押すと自前モーダルを挟まず
-  `file-input`を直接開く（[shor.html:1638-1652](../shor.html#L1638-L1652)、
+  `file-input`を直接開く（[shor.html:1639-1653](../shor.html#L1639-L1653)、
   `isIOS()`で判定）。iOS Safariは`accept="image/*"`のinputをタップすると
   OS標準で「写真を撮る/ライブラリ/ファイル」のアクションシートを出すため、
   自前モーダルを重ねると選択が二重になってしまう。この一本化により、
