@@ -4,11 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#34363b">
-<title>SHOR. — カメラロールの奥から、海へ。</title>
+<title>SHOR. — 見せるほどじゃない。でも、伝えたい。</title>
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://euspec-dev.github.io/shor-app/shor.html">
-<meta property="og:title" content="SHOR. — カメラロールの奥から、海へ。">
-<meta property="og:description" content="誰にも見せられなかった1枚が、誰かに届く。いいねも評価もない静かな海に、あなたの写真をボトルメールのように流す。見知らぬ誰かが、そっと現像してくれます。">
+<meta property="og:title" content="SHOR. — 見せるほどじゃない。でも、伝えたい。">
+<meta property="og:description" content="見せるほどじゃない。でも、伝えたい。その一枚を、ボトルメールのように知らない誰かへ流せます。いいねも、フォロワーもありません。">
 <meta property="og:image" content="https://euspec-dev.github.io/shor-app/icons/icon-512.png">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:image" content="https://euspec-dev.github.io/shor-app/icons/icon-512.png">
@@ -125,6 +125,41 @@ p.passage{font-size:11px;font-weight:400;letter-spacing:.22em;color:var(--ink-mi
 p.passage + p.passage{margin-top:2.4em}
 .small{font-size:10px;font-weight:300;color:var(--ink-faint);letter-spacing:.2em}
 .em{color:#f4f0e7}
+
+/* 投稿画面・閲覧画面・ホーム画面それぞれのポラロイド外側・上に置く
+   「その日のテーマ」表示。既存のポラロイド関連クラス（.polaroid等）とは
+   独立させ、新規クラスのみで組む。ホーム版だけ.theme-labelを2つ（日付＋
+   「今日のテーマ」）重ねて使う */
+.theme-note{text-align:center;margin-bottom:1.8em}
+.theme-note[hidden]{display:none}
+.theme-note .theme-label{font-size:9px;font-weight:300;letter-spacing:.24em;color:var(--ink-faint)}
+.theme-note .theme-text{margin-top:.6em;font-size:13px;font-weight:400;
+  letter-spacing:.3em;text-indent:.3em;color:var(--ink-mist)}
+
+/* ホーム画面の状態分岐（#home-a／#btn-see／#home-notice は互いに排他的に
+   表示する。切り替えはrenderHome()が担う）。
+   #btn-seeは「届いた一通を見る」ボタンを兼ねる（統合済み）。myPosts空の
+   ときは非表示、canView()がtrueなら文言「1通、流れ着いています」＋
+   クリック可、falseなら「次の一通は、明日の朝に」＋disabled */
+.home-status{appearance:none;background:transparent;border:none;cursor:pointer;
+  font:inherit;color:var(--ink-mist);font-size:12px;font-weight:400;
+  letter-spacing:.18em;padding:0;margin-bottom:1.8em;text-align:center;
+  transition:opacity .4s ease}
+.home-status:disabled{cursor:default;color:var(--ink-faint)}
+/* しらせ帯（未確認の結果があるときだけ表示）。サムネイルは重なり表示で
+   最大3件、それ以上は積んでもサムネイルを増やさない（件数はテキスト側で
+   表現しない仕様のため、4件目以降があっても見た目は3件のまま） */
+.notice-strip{display:flex;align-items:center;justify-content:center;gap:10px;
+  cursor:pointer;margin-bottom:1.8em;padding:9px 16px;
+  border:1px solid rgba(236,231,220,.18);border-radius:2px;
+  background:rgba(236,231,220,.05);transition:background-color .4s ease}
+.notice-strip:hover{background:rgba(236,231,220,.1)}
+.notice-strip-thumbs{display:flex}
+.notice-strip-thumbs .thumb{width:24px;height:24px;border-radius:50%;
+  background-size:cover;background-position:center;background-color:rgba(236,231,220,.15);
+  border:1px solid rgba(20,22,26,.5);margin-left:-8px}
+.notice-strip-thumbs .thumb:first-child{margin-left:0}
+.notice-strip span{font-size:10.5px;font-weight:300;letter-spacing:.16em;color:var(--ink-mist)}
 
 h2.quiet{font-size:10px;letter-spacing:.55em;color:var(--ink-faint);
   font-weight:400;margin-bottom:1.6em;text-indent:.55em}
@@ -498,7 +533,8 @@ footer a{color:inherit;text-decoration:none;border-bottom:1px solid rgba(207,201
 .polaroid .caption-input::placeholder{color:rgba(61,58,53,.38);letter-spacing:.16em}
 .cap-row{position:relative;padding-bottom:12px}
 .counter{position:absolute;right:0;bottom:14px;font-size:9px;font-weight:400;letter-spacing:.12em;
-  color:rgba(61,58,53,.45);transition:color .4s ease}
+  color:rgba(61,58,53,.45);opacity:0;transition:color .4s ease,opacity .4s ease}
+.counter.show{opacity:1}
 .counter.over{color:var(--rust)}
 .caption-input.over{color:var(--rust)}
 
@@ -523,6 +559,15 @@ footer a{color:inherit;text-decoration:none;border-bottom:1px solid rgba(207,201
      ジェスチャーは#post-photo側でまとめて処理するため、imgでは拾わない */
 }
 .polaroid .photo .post-adjust.loaded{opacity:1}
+/* 初回（myPosts空）だけ薄く表示する見本写真＋見本キャプション。btn-pickの
+   下に敷くだけの飾りで、pointer-eventsを切って操作を一切奪わない。
+   実際の写真を選ぶとopenPost()とは別にhandlePickedFile()側で非表示にする */
+.post-dummy{position:absolute;inset:0;opacity:.4;pointer-events:none;
+  display:flex;align-items:flex-end;justify-content:center}
+.post-dummy img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.post-dummy p{position:relative;margin:0;padding:14px;text-align:center;
+  color:#fff;font-size:10.5px;font-weight:300;letter-spacing:.18em;
+  text-shadow:0 1px 4px rgba(0,0,0,.6)}
 .pick{position:absolute;inset:0;display:grid;place-items:center;cursor:pointer;
   color:rgba(245,241,232,.6);font-size:11px;font-weight:400;letter-spacing:.32em;text-indent:.32em;
   transition:opacity 500ms ease;background:transparent;border:none;
@@ -642,19 +687,31 @@ footer a{color:inherit;text-decoration:none;border-bottom:1px solid rgba(207,201
 
   <!-- ============ 画面1: ダッシュボード ============ -->
   <section class="screen" id="scr-home" aria-label="ホーム">
-    <div id="home-a" hidden>
-      <p class="passage">ここは、フォロワーや評価のない<br>静かな海。</p>
-      <p class="passage">誰かに見せるための写真ではなく、<br>あなただけの <span class="em">感性</span> を<br>ボトルメールのように<br>海に浮かべてみる。</p>
-      <p class="passage">あなたの感性は<br>受け取った誰かの温もりで、<br>ゆっくりと現像されます。<br>あなたと誰かとの間でだけ、<br>あなたの感性が共有されます。</p>
-      <p class="passage">まずは、あなたのもとに流れ着いた<br>誰かの『感性』に触れてみてください。</p>
+    <div class="theme-note" id="home-theme">
+      <p class="theme-label" id="home-theme-date"></p>
+      <p class="theme-label">今日のテーマ</p>
+      <p class="theme-text" id="home-theme-text"></p>
     </div>
-    <button class="btn" id="btn-see">誰かの感性に触れる</button>
-    <button class="to-top" id="home-to-post" type="button" style="margin-top:1.8em;padding-top:0">写真を海に流す</button>
+    <div id="home-a" hidden>
+      <p class="passage">見せるほどじゃない。でも、伝えたい。</p>
+      <p class="passage">その一枚を、ボトルメールのように<br>知らない誰かへ流せます。</p>
+      <p class="passage">いいねも、フォロワーもありません。</p>
+    </div>
+    <button class="home-status" id="btn-see" hidden></button>
+    <div class="notice-strip" id="home-notice" hidden>
+      <div class="notice-strip-thumbs" id="home-notice-thumbs"></div>
+      <span>しらせが届いています</span>
+    </div>
+    <button class="btn" id="home-to-post" type="button" style="margin-top:1.8em;padding-top:0">写真を流す</button>
   </section>
 
   <!-- ============ 画面2: 閲覧（現像） ============ -->
   <section class="screen" id="scr-view" aria-label="現像">
-    <p class="passage view-intro" id="view-intro">あなたのもとへ<br>誰かのボトルメールが<br>流れ着いたようです。</p>
+    <p class="passage view-intro" id="view-intro">誰かのボトルメールが、流れ着きました</p>
+    <div class="theme-note" id="view-theme" hidden>
+      <p class="theme-label" id="view-theme-label"></p>
+      <p class="theme-text" id="view-theme-text"></p>
+    </div>
     <div class="unroll-stage" id="view-unroll-stage">
       <div class="polaroid-shadow">
         <div class="polaroid-clip">
@@ -667,7 +724,7 @@ footer a{color:inherit;text-decoration:none;border-bottom:1px solid rgba(207,201
             <div class="skirt">
               <div class="dev-zone" id="dev-zone" role="button" aria-label="長押しで現像する">
                 <div class="heat" id="heat"></div>
-                <span id="dev-label">現像する（長押し）</span>
+                <span id="dev-label">温めて現像する（長押し）</span>
               </div>
               <div class="under-note" id="under-note"></div>
             </div>
@@ -696,25 +753,33 @@ footer a{color:inherit;text-decoration:none;border-bottom:1px solid rgba(207,201
         </svg>
       </div>
     </div>
-    <div class="screen-note pending" id="view-screen-note">※スクリーンショット等での写真の保存はご遠慮ください。</div>
+    <div class="screen-note pending" id="view-screen-note">※写真の保存はご遠慮ください</div>
   </section>
 
   <!-- ============ 画面3: 投稿（海に流す） ============ -->
   <section class="screen" id="scr-post" aria-label="海に流す">
     <p class="passage post-lead" id="post-lead" style="margin-top:2.6em;margin-bottom:3em">今度はこっそりと、<br>あなたの感性を誰かに届けてみませんか？</p>
+    <div class="theme-note" id="post-theme">
+      <p class="theme-label">今日のテーマ</p>
+      <p class="theme-text" id="post-theme-text"></p>
+    </div>
     <div class="sendoff-stage" id="sendoff-stage">
       <div class="sendoff-shadow">
         <div class="sendoff-clip">
           <div class="polaroid" id="post-polaroid">
             <div class="cap-row">
               <input class="caption-input" id="cap-input" type="text" inputmode="text"
-                     enterkeyhint="done" maxlength="40"
-                     placeholder="説明を入力（任意）" autocomplete="off">
+                     enterkeyhint="done" maxlength="15"
+                     placeholder="ひとことそえる" autocomplete="off">
               <div class="counter" id="cap-counter">0/15</div>
             </div>
             <div class="photo" id="post-photo">
               <div class="post-blur" id="post-blur"></div>
               <img class="post-adjust" id="post-adjust" alt="" hidden>
+              <div class="post-dummy" id="post-dummy" hidden>
+                <img id="post-dummy-img" src="" alt="">
+                <p id="post-dummy-caption"></p>
+              </div>
               <button class="pick" id="btn-pick" type="button">＋ 写真を選ぶ</button>
               <div class="photo-note" id="photo-note"></div>
               <input type="file" id="file-input" accept="image/*" hidden>
@@ -736,22 +801,22 @@ footer a{color:inherit;text-decoration:none;border-bottom:1px solid rgba(207,201
         <img src="bottle.png" alt="" width="190">
       </div>
     </div>
-    <button class="to-top" id="post-to-top" type="button">TOPへ戻る</button>
+    <button class="to-top" id="post-to-top" type="button">ホームへ</button>
   </section>
 
   <!-- ============ 画面4: 投稿完了 ============ -->
   <section class="screen" id="scr-done" aria-label="投稿完了">
     <div class="done-body pending" id="done-body">
       <div class="done-main">
-        <p class="passage">あなたの一枚が、誰かの岸へ向かっています<br>明日の朝7時、しらせが流れ着きます</p>
+        <p class="passage">あなたの一枚が、誰かの岸へ向かっています<br>早ければ明日の朝、しらせが届きます</p>
         <div class="done-actions">
-          <button class="btn" id="btn-give2see">誰かの感性に触れる</button>
-          <button class="btn" id="btn-post-again">もう一通海に流す</button>
+          <button class="btn" id="btn-give2see">届いた一通を見る</button>
+          <button class="btn" id="btn-post-again">もう一枚流す</button>
         </div>
-        <button class="to-top" id="done-to-top" type="button" style="margin-top:1.8em;padding-top:0">TOPへ戻る</button>
+        <button class="to-top" id="done-to-top" type="button" style="margin-top:1.8em;padding-top:0">ホームへ</button>
       </div>
       <div class="done-foot">
-        <p class="small" id="pwa-note">現在はプロトタイプとしてひっそりと開かれています。<br>もし気に入っていただけたなら、<br>ホーム画面に追加して応援してください。</p>
+        <p class="small" id="pwa-note">明日の朝も、テーマとしらせが待っています<br>ホーム画面に置いておくと、すぐ開けます</p>
         <button class="btn done-pwa" id="btn-pwa">ホーム画面に追加する</button>
         <p class="small" id="pwa-help"></p>
       </div>
@@ -762,12 +827,11 @@ footer a{color:inherit;text-decoration:none;border-bottom:1px solid rgba(207,201
 
 <!-- 前日投稿の結果ポップアップ（コンセプト画面に重ねて表示） -->
 <div id="result-modal" class="modal" hidden>
-  <div class="modal-card" role="dialog" aria-modal="true" aria-label="あなたの感性のゆくえ">
+  <div class="modal-card" role="dialog" aria-modal="true" aria-label="あなたの一枚は">
     <button class="modal-close" id="result-close" type="button" aria-label="閉じる">×</button>
-    <h2 class="quiet">あなたの感性のゆくえ</h2>
-    <p class="passage">昨日のあなたの感性は、<br>見知らぬ誰かのもとへ<br>流れ着きました。</p>
+    <h2 class="quiet">あなたの一枚は</h2>
     <div class="result-thumb" id="result-thumb" hidden></div>
-    <p class="passage em"><span id="result-sec" style="font-size:1.35em">--</span> 秒間、<br>誰かの感性と深く響き合いました。</p>
+    <p class="passage em"><span id="result-sec" style="font-size:1.35em">--</span>秒<br>見つめられていました</p>
   </div>
 </div>
 
@@ -782,9 +846,9 @@ footer a{color:inherit;text-decoration:none;border-bottom:1px solid rgba(207,201
 <!-- 写真の追加元を選ぶポップアップ（iOS/Android共通。カメラ経由かどうかを
      経路で判定するために、OSを問わずこのモーダルで出し分ける） -->
 <div id="pick-choice-modal" class="modal" hidden>
-  <div class="modal-card" role="dialog" aria-modal="true" aria-label="写真を追加">
+  <div class="modal-card" role="dialog" aria-modal="true" aria-label="写真を選ぶ">
     <button class="modal-close" id="pick-choice-close" type="button" aria-label="閉じる">×</button>
-    <p class="quiet">写真を追加</p>
+    <p class="quiet">写真を選ぶ</p>
     <div class="modal-actions">
       <button class="btn-choice" id="btn-choice-camera" type="button">写真を撮る</button>
       <button class="btn-choice" id="btn-choice-gallery" type="button">ギャラリーから選ぶ</button>
@@ -843,6 +907,32 @@ const appYesterdayStr = () => {
   d.setDate(d.getDate()-1);
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 };
+
+/* ---------- 投稿テーマ（30日周期で巡回） ----------
+   並び順を変えると、既存投稿に保存済みのテーマ（インデックス由来）と
+   実際の並びがずれるため、要素の並べ替え・削除はしないこと。
+   末尾への追加のみ安全。 */
+const THEMES = [
+  "なんとなく好き","マイブーム","撮らずにはいられなかった","毎日見る",
+  "誰にも見せていない","なくなると困る","よーく見てほしい","ひとりで笑ってしまった",
+  "一日を労ってくれる","好きだとしか言えない","買った日を覚えている","近づいて見てほしい",
+  "いつもそばにある","うまく言えないけど、いいと思った","愛用している","こんなことある？",
+  "お分かりいただけただろうか","今ちょうど手元にあった","自分だけが好き","自分しか見ていなかった",
+  "いつもの窓から","もう何年も使っている","理由はないけど撮っていた","何もない日の過ごし方",
+  "どういうこと？","捨てられずにいる","誰かに言いたかった","しまい込んだままだった",
+  "ずっと気になっている","同じものばかり撮ってしまう"
+];
+/* appDayStr()の文字列をUTC日付として解釈し、エポックからの通算日数を
+   THEMES.lengthで割った余りを添字にする。同じ暦日なら常に同じテーマになる */
+function themeFor(dayStr = appDayStr()){
+  const days = Math.floor(new Date(dayStr + "T00:00:00Z").getTime() / 86400000);
+  return THEMES[((days % THEMES.length) + THEMES.length) % THEMES.length];
+}
+
+/* 初回投稿前（myPosts空）だけ投稿画面に薄く重ねる見本写真・見本キャプション。
+   仮の値。本番実装時に差し替え用の画像・文言を確認すること。 */
+const DUMMY_PHOTO_URL = "bottle.png";
+const DUMMY_CAPTION = "見本の一枚です";
 
 /* ---------- ユーザーID (localStorage で永続化) ---------- */
 /* crypto.randomUUID はセキュアコンテキスト（https: /localhost）専用。
@@ -933,7 +1023,8 @@ async function createPost(imageUrl, message){
   const { data, error } = await db.from("posts").insert({
     author_id: userId,
     image_url: imageUrl,
-    message: message
+    message: message,
+    theme: themeFor()
   }).select("id").single();
   if (error) throw error;
   return data.id;
@@ -1039,14 +1130,16 @@ function consumeView(){
    画面1: ダッシュボード
    ============================================================ */
 let pendingResults = [];
-let afterResultAction = null;
 
 async function renderHome(){
-  $("home-a").hidden = false;
   show("scr-home");
 
-  pendingResults = [];
   const today = appDayStr();
+  const [, mm, dd] = today.split("-").map(s => parseInt(s, 10));
+  $("home-theme-date").textContent = `${mm}月${dd}日`;
+  $("home-theme-text").textContent = `「${themeFor(today)}」`;
+
+  pendingResults = [];
 
   /* この機能を入れる前からの保留分（投稿単位のサムネイルを持たない）だけ、
      後方互換として日付単位のまま拾う。サムネイルは無いので秒数のみ表示。
@@ -1073,17 +1166,42 @@ async function renderHome(){
     if (seconds === null) continue;
     pendingResults.push({ postId: p.id, seconds, thumb: p.thumb || null });
   }
-}
 
-/* 保留中の結果があればモーダルを先に見せ、閉じてから本来の遷移を行う。
-   複数件ある場合はモーダルを閉じるたびに次の1件を表示し、無くなってから
-   本来のアクションに進む（closeResultModal()参照）。 */
-function withResultGate(action){
-  if (pendingResults.length){
-    afterResultAction = action;
-    showNextResult();
+  /* ホームの状態分岐（3状態、互いに排他的）。myPosts空＝初回説明文。
+     それ以外はcanView()で2状態に分岐し、#btn-see（「届いた一通を見る」
+     ボタンを兼ねる）の文言とdisabledを切り替える。 */
+  const homeA = $("home-a"), status = $("btn-see");
+  if (myPosts.length === 0){
+    homeA.hidden = false;
+    status.hidden = true;
   } else {
-    action();
+    homeA.hidden = true;
+    status.hidden = false;
+    if (canView()){
+      status.textContent = "1通、流れ着いています";
+      status.disabled = false;
+    } else {
+      status.textContent = "次の一通は、明日の朝に";
+      status.disabled = true;
+    }
+  }
+
+  /* しらせ帯: 未確認の結果（pendingResults）が1件以上あるときだけ表示する。
+     サムネイルはthumbを持つものだけ古い順に最大3件（レガシーな日付単位の
+     保留分はthumbを持たないためサムネイルには出ない）。秒数はここには
+     出さず、タップしてモーダルを開くまで伏せる（showNextResult()参照）。 */
+  const notice = $("home-notice"), thumbsEl = $("home-notice-thumbs");
+  if (pendingResults.length){
+    thumbsEl.innerHTML = "";
+    pendingResults.filter(r => r.thumb).slice(0, 3).forEach(r => {
+      const el = document.createElement("div");
+      el.className = "thumb";
+      el.style.backgroundImage = `url("${r.thumb}")`;
+      thumbsEl.appendChild(el);
+    });
+    notice.hidden = false;
+  } else {
+    notice.hidden = true;
   }
 }
 
@@ -1128,6 +1246,7 @@ async function openView(origin){
   $("view-polaroid").classList.remove("washed");
   $("view-caption").textContent = "";
   $("view-pic").style.backgroundImage = "";
+  $("view-theme").hidden = true; /* 前回の投稿にテーマがあった場合の残留を防ぐ */
   heldTotalSec = 0;
   currentPostId = null;
 
@@ -1149,13 +1268,20 @@ async function openView(origin){
        直後だとPWA案内(#pwa-note)と重なってしまう。先に画面遷移してから
        モーダルで知らせることで、どの画面に戻っても重ならないようにする */
     if (viewOrigin === "done") backToDone(); else renderHome();
-    openNotice("まだ写真が届いていません。<br>あなたが最初の一人になりませんか？");
+    openNotice("まだ、流れ着いた一枚がありません<br>あなたが最初の一人になりませんか");
     return;
   }
 
   currentPostId = drift.id;
   $("view-caption").textContent = drift.message || "";
   $("view-pic").style.backgroundImage = `url("${drift.image_url}")`;
+  /* themeがnull（古い投稿・シード投稿）の場合は#view-themeを非表示のままにする。
+     表示自体は下の巻紙が開くタイミングに合わせるため、ここでは中身だけ用意する */
+  if (drift.theme){
+    const d = new Date(drift.created_at);
+    $("view-theme-label").textContent = `${d.getMonth() + 1}月${d.getDate()}日のテーマ`;
+    $("view-theme-text").textContent = `「${drift.theme}」`;
+  }
 
   introTimers.forEach(clearTimeout); introTimers = [];
   introTimers.push(setTimeout(() => intro.classList.add("show"), 1250));
@@ -1167,6 +1293,7 @@ async function openView(origin){
        クラス（詳細はCSS側.unroll-stage.play.rolling .polaroidのコメント参照）。
        巻紙が開き切る頃（4.1s後）に外し、以降の現像インタラクションに影響しないようにする */
     unrollStage.classList.add("play", "rolling"); /* ひもがほどけてポラロイドが開く演出を開始 */
+    if (drift.theme) $("view-theme").hidden = false;
     snote.classList.remove("pending");
     introTimers.push(setTimeout(() => unrollStage.classList.remove("rolling"), 4100));
   }, 4500));
@@ -1200,7 +1327,7 @@ function tick(now){
     consumeView(); /* 枠の消費は現像が完了した段階で行う */
     confirmPromise = confirmDrift(currentPostId); /* サーバ側の予約もここで初めて行う */
     devLabel.style.opacity = ".35";
-    note.innerHTML = "写真が現像されました。<br>指を離すと写真は見られなくなります。";
+    note.innerHTML = "指を離すと、この一枚は流れていきます";
     note.classList.add("show");
   }
   if (t < 1) raf = requestAnimationFrame(tick);
@@ -1235,6 +1362,10 @@ function release(){
       if (pid) await recordViewHistoryDB(pid, finalSec);
     })();
     $("view-polaroid").classList.add("washed");
+    /* 写真が流れ去るタイミングで、案内文を投稿への誘導メッセージに差し替える。
+       次にopenView()が呼ばれるまでこのままなので、下のsetTimeoutで元の
+       文言に戻しておく */
+    $("view-screen-note").textContent = "あなたの一枚も、流してみませんか";
     $("view-screen-note").classList.add("fading");
     setTimeout(() => {
       leaving = false;
@@ -1242,6 +1373,7 @@ function release(){
       snote.style.transition = "none";
       snote.classList.remove("fading");
       snote.classList.add("pending");
+      snote.textContent = "※写真の保存はご遠慮ください";
       void snote.offsetWidth;
       snote.style.transition = "";
       if (viewOrigin === "done") renderHome();
@@ -1465,6 +1597,19 @@ function showPickError(text, ms = 3600){
 function openPost(){
   $("post-lead").hidden = false;
   $("post-polaroid").hidden = false;
+  $("post-theme-text").textContent = `「${themeFor()}」`;
+  /* 戻る導線: 閲覧可能なら閲覧画面へ誘導、不可なら通常のホームへ戻る
+   （動作はpost-to-topのclickハンドラ側、canView()で分岐） */
+  $("post-to-top").textContent = canView() ? "届いた一通を見る" : "ホームへ";
+  /* myPosts空（一度も投稿していない）ときだけ、見本写真・見本キャプションを
+     薄く重ねる。写真を選んだ瞬間にhandlePickedFile()側で消す */
+  if (store.get("myPosts", []).length === 0){
+    $("post-dummy-img").src = DUMMY_PHOTO_URL;
+    $("post-dummy-caption").textContent = DUMMY_CAPTION;
+    $("post-dummy").hidden = false;
+  } else {
+    $("post-dummy").hidden = true;
+  }
   show("scr-post");
   /* 送り出し演出のボトル画像(bottle.png)は演出開始から約3秒後に登場するが、
      投稿完了までノーロードのままだと初回表示時に欠けたり遅れたりするため、
@@ -1480,6 +1625,7 @@ function postValid(){
 function refreshPostUI(){
   const len = [...capInput.value].length;
   capCounter.textContent = `${len}/15`;
+  capCounter.classList.toggle("show", len >= 11); /* 残り5文字（11文字目）を切ってから表示 */
   capCounter.classList.toggle("over", len > 15);
   capInput.classList.toggle("over", len > 15);
   btnSend.disabled = !postValid();
@@ -1527,10 +1673,11 @@ async function handlePickedFile(file, fromCamera){
   if (!fromCamera && !DEV_SKIP_PHOTO_CHECK){
     const buf = await file.arrayBuffer();
     if (isPng(buf)){
-      showPickError("スクリーンショットは選べません");
+      showPickError("自分で撮った写真を流してください");
       return;
     }
   }
+  $("post-dummy").hidden = true; /* 見本写真は実際の選択が済んだ時点で消す */
   pickedDataUrl = await downscale(file, 1280);
   startAdjust(pickedDataUrl);
   btnPick.classList.add("picked");
@@ -1553,7 +1700,7 @@ cameraInput.addEventListener("change", () => {
 btnSend.addEventListener("click", async () => {
   if (!postValid()) return;
   btnSend.disabled = true;
-  btnSend.textContent = "送信中…";
+  btnSend.textContent = "流しています";
 
   try {
     const finalDataUrl = await cropAdjusted(1080);
@@ -1693,15 +1840,20 @@ function backToDone(){
 
 $("btn-give2see").addEventListener("click", () => {
   if (!canView()){
-    openNotice("未開封のボトルメールは以上です。<br>朝7時に、次の一通が流れ着きます。");
+    openNotice("今日のボトルメールは以上です<br>朝7時に、次の一通が流れ着きます");
     return;
   }
   openView("done");
 });
 $("btn-post-again").addEventListener("click", () => openPost());
-$("post-to-top").addEventListener("click", () => renderHome());
+/* canView()がtrueなら閲覧画面へ、falseならホームへ（openPost()側で文言も
+   合わせて切り替えている） */
+$("post-to-top").addEventListener("click", () => {
+  if (canView()) openView("post"); else renderHome();
+});
 $("done-to-top").addEventListener("click", () => renderHome());
-$("home-to-post").addEventListener("click", () => withResultGate(() => openPost()));
+$("home-to-post").addEventListener("click", () => openPost());
+$("home-notice").addEventListener("click", () => showNextResult());
 
 /* --- PWAインストール ---
    manifest.json / service-worker.js / icons が揃って初めて、Chromium系ブラウザで
@@ -1788,10 +1940,6 @@ function closeResultModal(){
   hideModal("result-modal");
   if (pendingResults.length){
     setTimeout(showNextResult, 700);
-  } else if (afterResultAction){
-    const action = afterResultAction;
-    afterResultAction = null;
-    setTimeout(action, 700);
   }
 }
 function openNotice(html){ $("notice-text").innerHTML = html; showModal("notice-modal"); }
@@ -1806,19 +1954,9 @@ $("notice-modal").addEventListener("click", e => {
   if (e.target === $("notice-modal")) closeNotice();
 });
 
-$("btn-see").addEventListener("click", () => withResultGate(() => {
-  if (!canView()){
-    const g = store.get("postGrants", null);
-    const postedToday = g && g.date === appDayStr() && g.granted;
-    if (postedToday){
-      openNotice("未開封のボトルメールは以上です。<br>朝7時に、次の一通が流れ着きます。");
-    } else {
-      openNotice("ボトルメールは1日1通だけ届きます。<br>自分のボトルメールを海に流すと、<br>追加で1通だけ届きます。");
-    }
-    return;
-  }
-  openView("home");
-}));
+/* renderHome()がcanView()===falseのとき既にdisabledにしているため、
+   ここでは無条件にopenViewしてよい（disabledなbuttonはclickが発火しない） */
+$("btn-see").addEventListener("click", () => openView("home"));
 
 /* ===== 開発テスト用（IS_DEVでのみ有効。本番configでは devbar 自体を除去する） ===== */
 if (IS_DEV){

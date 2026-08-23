@@ -2,7 +2,7 @@
 
 Supabase (Postgres + Storage) 上の実体。認証は無く、匿名UUID
 （`localStorage`の`shor:uid`）がそのままユーザーIDとして使われる
-（[shor.html:847-860](../shor.html#L847-L860)）。
+（[shor.html:937-950](../shor.html#L937-L950)）。
 
 ### なぜiOSだけ別のmanifestを使うのか
 
@@ -34,7 +34,7 @@ Safari標準UIが表示され、フルスクリーンのネイティブアプリ
 
 ## 投稿結果表示用のローカルストレージ（shor:myPosts）
 
-「あなたの感性のゆくえ」結果モーダル（[screens.md](screens.md)参照）は
+「あなたの一枚は」結果モーダル（[screens.md](screens.md)参照）は
 投稿1件ごとにサムネイル付きで表示するため、投稿成功時に`localStorage`の
 `shor:myPosts`へ自分の投稿を記録している。サーバ側に「これは自分の投稿の
 一覧」という専用テーブルは無く、あくまでクライアント側の表示専用データ。
@@ -43,20 +43,20 @@ Safari標準UIが表示され、フルスクリーンのネイティブアプリ
   `Date.now()`（ミリ秒epoch）、`thumb`は長辺240px・JPEG品質0.5の
   サムネイルdataURL
 - 書き込み: `btnSend`のクリックハンドラ内、`createPost()`成功直後
-  （[shor.html:1563-1565](../shor.html#L1563-L1565)）。サムネイルは
-  `makeThumb(finalDataUrl, 240, .5)`（[shor.html:1667-1679](../shor.html#L1667-L1679)）
+  （[shor.html:1710-1712](../shor.html#L1710-L1712)）。サムネイルは
+  `makeThumb(finalDataUrl, 240, .5)`（[shor.html:1814-1826](../shor.html#L1814-L1826)）
   で生成する。`finalDataUrl`は投稿本体のアップロードにも使う
   `cropAdjusted()`（[screens.md](screens.md)の「投稿写真の拡大縮小・移動調整」
   節参照）の出力そのもので、`downscale()`（写真選択直後の縮小用）とは別の
   軽量版。既にJPEG化済みのdataURLを再度縮小するだけなのでFile/Blobを
   経由しない
-- 掃除: `pruneMyPostThumbs()`（[shor.html:914-918](../shor.html#L914-L918)）が
+- 掃除: `pruneMyPostThumbs()`（[shor.html:1004-1008](../shor.html#L1004-L1008)）が
   起動時に`STORAGE_EXPIRE_MS`（30日）より古いエントリを削除する。
   `cleanupOldPosts()`（サーバ側の投稿本体の掃除）とは別関数だが、
   同じ期限・同じタイミング（起動時）で走らせている
 - 読み出し: `renderHome()`が起動の度に`shor:myPosts`を読み、まだ結果を
   見せていない前日以前の投稿について`getResultForPost(postId)`
-  （[shor.html:983-989](../shor.html#L983-L989)）で`view_history`の
+  （[shor.html:1074-1080](../shor.html#L1074-L1080)）で`view_history`の
   `viewed_seconds`合計を取得する。`view_history`に行が無い（＝まだ誰にも
   見られていない）場合は`null`を返し、結果モーダルには出さず無言で
   先送りする（`resultConfirmed`フラグも立てない）。詳細は
@@ -68,7 +68,7 @@ Safari標準UIが表示され、フルスクリーンのネイティブアプリ
 
 | カラム | 型 | 備考 |
 |---|---|---|
-| `id` | uuid (PK) | クライアントが`genUUID()`（[shor.html:851-858](../shor.html#L851-L858)）で生成し、以後永続化する匿名ID |
+| `id` | uuid (PK) | クライアントが`genUUID()`（[shor.html:941-948](../shor.html#L941-L948)）で生成し、以後永続化する匿名ID |
 | `last_active_at` | timestamptz | `initUser()`が起動の度にupsertする |
 | `has_posted_ever` | boolean | 初投稿判定用。トリガーが自動更新（後述） |
 
@@ -88,12 +88,37 @@ Safari標準UIが表示され、フルスクリーンのネイティブアプリ
 | `is_opened` | boolean | 1人以上に現像されたか |
 | `total_viewed_seconds` | numeric | 全閲覧者の視聴秒数合計（トリガーで自動加算） |
 | `is_seed` | boolean | 運営提供のシード投稿か |
+| `theme` | text（nullable） | 投稿時点の30日周期テーマ。表示専用（下記「投稿テーマ」参照） |
 
-後半7カラム（`view_count`〜`is_seed`）は`supabase_migration.sql`で追加した
+`view_count`〜`is_seed`の7カラムは`supabase_migration.sql`で追加した
 配信管理用フィールド。詳細は[distribution.md](distribution.md)。以前は
 `distributable_until`（配信期限）カラムもあり`status`に`expired`もあったが、
 `supabase_migration_006_remove_distributable_until.sql`で撤廃した
 （配信期限を撤廃した理由は[distribution.md](distribution.md)参照）。
+`theme`は`supabase_migration_007_theme_and_view_order.sql`で追加した
+カラムで、既存行は`null`のまま埋めていない。
+
+## 投稿テーマ（30日周期）
+
+投稿画面・閲覧画面それぞれに、その投稿の日の「テーマ」を表示する
+（[screens.md](screens.md)参照）。仕様は次の通り。
+
+- `THEMES`（[shor.html:915-924](../shor.html#L915-L924)）: 30個の固定文言の
+  配列。**並び順を変更・削除しないこと** — 既に投稿済みの`posts.theme`は
+  文字列としてそのまま保存されるため実は並び替えても過去分には影響しないが、
+  `themeFor()`が将来の同じ暦日に対して常に同じテーマを返し続けるためには
+  順序を保つ必要がある（末尾への追加は安全）
+- `themeFor(dayStr = appDayStr())`（[shor.html:927-930](../shor.html#L927-L930)）:
+  `dayStr`をUTC日付として解釈し、エポックからの通算日数を`THEMES.length`
+  （30）で割った余りを添字にする純関数。同じ暦日を渡せば常に同じテーマを返す
+- 投稿時、`createPost()`が`themeFor()`（引数省略＝今日）の結果を`theme`
+  カラムに保存する。以後その投稿のテーマは固定され、後から`THEMES`の並びを
+  変えても既存投稿の表示は変わらない（文字列そのものを保存しているため）
+- `peek_drift`の戻り値に含まれる`theme`・`created_at`を使い、閲覧画面は
+  「（投稿日の月日）のテーマ」という形で表示する。`theme`が`null`
+  （`supabase_migration_007`より前の投稿、シード投稿）の場合は
+  テーマ表示ブロックごと非表示にする
+- 配信の足切り・順序には一切使わない（[distribution.md](distribution.md)参照）
 
 ### view_history
 
@@ -126,11 +151,11 @@ posts 1 ──< view_history (post_id)    -- 1投稿を複数人が閲覧でき�
 ## Storage
 
 バケット名: `photos`（公開バケット）。ファイル名は`genUUID()+".jpg"`
-（[shor.html:923](../shor.html#L923)）。`genUUID()`は`crypto.randomUUID()`が
+（[shor.html:1013](../shor.html#L1013)）。`genUUID()`は`crypto.randomUUID()`が
 使えればそれを使い、使えない場合（`http:`のLAN IPなど非セキュアコンテキスト。
 セキュアコンテキストは`https:`または`localhost`のみで、`crypto.randomUUID`は
 そこでしか実装されていない）は`crypto.getRandomValues()`から自前でUUID v4を
-組み立てるフォールバックに切り替える（[shor.html:851-858](../shor.html#L851-L858)）。
+組み立てるフォールバックに切り替える（[shor.html:941-948](../shor.html#L941-L948)）。
 `posts.image_url`にはパスではなく
 `.../storage/v1/object/public/photos/<uuid>.jpg`という完全なURLをそのまま
 保存している。そのため画像ファイル名から`posts`行を逆引きする処理
@@ -146,16 +171,16 @@ posts 1 ──< view_history (post_id)    -- 1投稿を複数人が閲覧でき�
 変更してある。スクリーンショットはOS標準でPNG形式で保存され、カメラ写真は
 基本的にJPEG/HEICでPNGにはならない、という前提を利用している。
 
-- `isPng(buffer)`（[shor.html:1641-1647](../shor.html#L1641-L1647)）
+- `isPng(buffer)`（[shor.html:1788-1794](../shor.html#L1788-L1794)）
   PNGのシグネチャ（先頭8バイト）を見るだけの単純な判定。EXIF解析はしない。
-- `handlePickedFile(file, fromCamera)`（[shor.html:1525-1540](../shor.html#L1525-L1540)）
+- `handlePickedFile(file, fromCamera)`（[shor.html:1671-1687](../shor.html#L1671-L1687)）
   - `fromCamera=true`（`camera-input`、`capture="environment"`経由。
     Androidの自前モーダルからのみ発生）: 撮ったばかりの写真は定義上
     カメラ写真なので、中身の判定を丸ごとスキップして無条件で受け付ける
   - `fromCamera=false`（iOSは後述の理由で常にこちら。Androidはギャラリー
     経由）: `isPng()`が`true`を返したら`showPickError()`で弾く
 - **iOS**: `btn-pick`「＋ 写真を選ぶ」を押すと自前モーダルを挟まず
-  `file-input`を直接開く（[shor.html:1492-1506](../shor.html#L1492-L1506)、
+  `file-input`を直接開く（[shor.html:1638-1652](../shor.html#L1638-L1652)、
   `isIOS()`で判定）。iOS Safariは`accept="image/*"`のinputをタップすると
   OS標準で「写真を撮る/ライブラリ/ファイル」のアクションシートを出すため、
   自前モーダルを重ねると選択が二重になってしまう。この一本化により、

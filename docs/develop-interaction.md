@@ -1,7 +1,7 @@
 # 現像インタラクション（長押し）
 
 scr-view画面で、ブラウザ写真のポラロイドを「現像」するための長押し操作の
-実装。コードは[shor.html:1176-1259](../shor.html#L1176-L1259)にまとまっている。
+実装。コードは[shor.html:1303-1391](../shor.html#L1303-L1391)にまとまっている。
 枠の消費・サーバ側の予約タイミングとの関係は[view-grants.md](view-grants.md)・
 [distribution.md](distribution.md)を参照。ここでは操作そのものの状態遷移を扱う。
 
@@ -16,16 +16,16 @@ scr-view画面で、ブラウザ写真のポラロイドを「現像」するた
 | `confirmPromise` | 現像完了時に発火した`confirmDrift()`のPromise（`release()`が待ち合わせに使う） |
 | `noteTimer` | 「離すのが早すぎる」ナグメッセージの自動非表示タイマー |
 
-`resetDevelop(hard)`（[shor.html:1181-1190](../shor.html#L1181-L1190)）が
+`resetDevelop(hard)`（[shor.html:1308-1317](../shor.html#L1308-L1317)）が
 これらを初期状態に戻す。`hard=true`は新しい写真を開いたとき
 （`openView()`内）、`hard=false`は現像未完了のまま指を離したときに使う
 （`hard=false`では下部の案内テキストは消さない）。
 
 ## 押している間: `tick(now)`
 
-`DEVELOP_MS = 5000`（[shor.html:826](../shor.html#L826)）で正規化した
+`DEVELOP_MS = 5000`（[shor.html:890](../shor.html#L890)）で正規化した
 進捗`t`（0〜1）から、`e = 1 - (1-t)^2`という減速イージングを作り、
-写真のぼかしと粒度を滑らかに解いていく（[shor.html:1192-1207](../shor.html#L1192-L1207)）。
+写真のぼかしと粒度を滑らかに解いていく（[shor.html:1319-1334](../shor.html#L1319-L1334)）。
 
 ```
 blur      : 26px → 0px          (26 * (1 - e))
@@ -37,10 +37,10 @@ frost透明度: 1   → 0            (1 - e)
 - `developed = true`
 - `consumeView()`（閲覧枠の消費、[view-grants.md](view-grants.md)）
 - `confirmDrift(currentPostId)`をfire-and-forgetで呼び、`confirmPromise`に保持
-- 現像完了ラベルの表示切り替え、「写真が現像されました。指を離すと写真は
-  見られなくなります。」という案内を表示
+- 現像完了ラベルの表示切り替え、「指を離すと、この一枚は流れていきます」
+  という案内を表示
 
-案内文（`#under-note`）は`min-height:3.9em`（[shor.html:478](../shor.html#L478)）を
+案内文（`#under-note`）は`min-height:3.9em`（[shor.html:513](../shor.html#L513)）を
 持たせてあり、表示/非表示で本文の高さが変わらないようにしている。この文言は
 `<br>`で強制的に2行になるため、以前`min-height`が2行分に足りておらず、
 文言が出た瞬間にscr-view全体の位置がわずかにずれるバグがあった（修正済み）。
@@ -50,7 +50,7 @@ frost透明度: 1   → 0            (1 - e)
 
 ## 押し始め: `pointerdown`
 
-`zone.setPointerCapture(e.pointerId)`（[shor.html:1212](../shor.html#L1212)）
+`zone.setPointerCapture(e.pointerId)`（[shor.html:1339](../shor.html#L1339)）
 でポインタをキャプチャし、指がゾーンの外に出てもイベントを取り続けられる
 ようにしている（＝押している間にスクロール等で指がずれても`pointerup`を
 確実に拾える）。`leaving`中（wash演出中）は新しい押下を無視する。
@@ -65,14 +65,18 @@ frost透明度: 1   → 0            (1 - e)
 1. `leaving = true`にして以降の押下を無視
 2. `confirmPromise`の完了を待ってから`recordViewHistoryDB()`で
    `viewed_seconds`を確定更新する非同期処理を(待たずに)開始する
-   （[shor.html:1232-1236](../shor.html#L1232-L1236)。UIのwash演出はこれを
+   （[shor.html:1359-1363](../shor.html#L1359-L1363)。UIのwash演出はこれを
    待たずに即座に始まる — 詳細は[distribution.md](distribution.md)の
    「peek → confirm」節）
-3. ポラロイドに`washed`クラス、案内文に`fading`クラスを付けてフェードアウト
+3. ポラロイドに`washed`クラス付与と同時に、案内文（`#view-screen-note`）の
+   文言を「あなたの一枚も、流してみませんか」に差し替えてから`fading`クラスを
+   付けてフェードアウトする（写真が流れ去る演出に合わせた投稿への誘導）
 4. 1500ms後、要素をリセットして次の画面へ:
    `viewOrigin === "done"` なら`renderHome()`、それ以外は`openPost()`
    （投稿完了画面経由で見た場合も、現像後は投稿完了画面には戻らずホームへ
-   抜ける意図的な仕様。詳細は[screens.md](screens.md)のscr-view節参照）
+   抜ける意図的な仕様。詳細は[screens.md](screens.md)のscr-view節参照）。
+   同じタイミングで案内文を元の「※写真の保存はご遠慮ください」に戻し、
+   次にこの画面を開いたときのために復元しておく
 
 ### 現像未完了のまま離した場合（`developed === false`）
 
@@ -86,7 +90,7 @@ frost透明度: 1   → 0            (1 - e)
 `shor.html`全体で長押しメニュー・選択・ドラッグ保存を無効化している。
 CSS側（[shor.html:59-68](../shor.html#L59-L68)）で
 `user-select`/`touch-callout`/`user-drag`等を`none`にし、その上でJS側
-（[shor.html:992-993](../shor.html#L992-L993)、`contextmenu`/`selectstart`/
+（[shor.html:1083-1084](../shor.html#L1083-L1084)、`contextmenu`/`selectstart`/
 `dragstart`の`preventDefault`）が「最終防衛線」として二重に無効化している。
 これは現像ゾーンの長押しがOS標準のコンテキストメニューやテキスト選択と
 衝突しないようにするための、アプリ全体にかかる前提。
