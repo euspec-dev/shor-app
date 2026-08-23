@@ -16,17 +16,20 @@ SQL側の実体は次の6つのマイグレーションファイル。上から�
 6. `supabase_migration_006_remove_distributable_until.sql` — 配信期限
    （`distributable_until`）を撤廃し、スコアの`urgency`項を`age`項に
    置き換え（詳細は下記）
+7. `supabase_migration_007_theme_and_view_order.sql` — `posts.theme`を
+   追加し、`peek_drift`の候補選択を加重ランダムから`view_count`昇順
+   （同点内ランダム）に変更（詳細は下記）
 
 閲覧権（1日に何回見られるか）については [view-grants.md](view-grants.md) 参照。
 本ドキュメントは「どの投稿が選ばれるか」「どこまで配られたら打ち止めか」を扱う。
+投稿テーマ（`theme`）については[data-model.md](data-model.md)参照。
 
 ## 目的
 
 1枚の写真を「気の合う誰かに」ではなく、**できるだけ多くの投稿を
 最低1人には届ける**ことだけを最適化する。好み・傾向によるパーソナライズは
-一切行わない（`peek_drift`の重み付けは投稿の"未到達さ・古さ・不利さ"だけを
-見ており、閲覧者の過去の好みは見ていない）。配信に期限は設けていない
-（後述）。
+一切行わない（`peek_drift`は候補の`view_count`だけを見て選んでおり、
+閲覧者の過去の好みは見ていない）。配信に期限は設けていない（後述）。
 
 ## 到達人数 K（`max_reach`）
 
@@ -55,10 +58,13 @@ update distribution_config set k_default = 4;
 | `is_opened` | 1人以上に現像されたか |
 | `total_viewed_seconds` | 全閲覧者の視聴秒数の合計（`view_history`更新トリガーで自動加算） |
 | `is_seed` | 運営提供のシード投稿か |
+| `theme` | 投稿時の30日周期テーマ（`text`, nullable）。詳細は[data-model.md](data-model.md)参照 |
 
 以前は`distributable_until`（配信期限）カラムと`status='expired'`もあったが、
 `supabase_migration_006_remove_distributable_until.sql`で撤廃した
-（理由は下記「配信期限を撤廃した理由」参照）。
+（理由は下記「配信期限を撤廃した理由」参照）。`theme`は
+`supabase_migration_007_theme_and_view_order.sql`で追加した表示専用の
+カラムで、**配信の足切り・順序には一切使わない**（既存行はnullのまま）。
 
 パラメータ（K・重み・視聴枠）は`distribution_config`という1行だけの
 シングルトンテーブルに切り出してあり、コードを変えずにSQLの`UPDATE`だけで
@@ -80,7 +86,7 @@ update distribution_config set k_default = 4;
 
 ### 1. `peek_drift(viewer_id)` — 候補を選ぶだけ（副作用なし）
 
-写真を開いた瞬間、`getRandomDrift()`（[shor.html:884-888](../shor.html#L884-L888)）
+写真を開いた瞬間、`getRandomDrift()`（[shor.html:974-978](../shor.html#L974-L978)）
 から呼ばれる。以下の**足切り**を満たす投稿だけを候補にする。
 
 1. `status = 'active'`
@@ -88,37 +94,32 @@ update distribution_config set k_default = 4;
 3. `author_id != viewer_id`（自分の投稿は除外）
 4. その`viewer`がまだ見ていない（`view_history`にその投稿の行が無い）
 
-候補それぞれに次のスコアを付け、**スコアを重みとした加重ランダム抽選**
-（Efraimidis–Spirakis法: `power(random(), 1/weight) DESC LIMIT 1`）で
-1件選ぶ。決定論的な最大値選択にしないことで「偶然」の手触りを残す。
+候補を**`view_count`昇順、同点内はランダム**（`order by view_count asc,
+random() limit 1`）で並べ、先頭の1件を返す。まだ誰にも見られていない
+投稿（`view_count = 0`）が常に最優先で選ばれ、`view_count`が並んでいる
+候補が複数あるときだけその中からランダムに決まる。完全な決定論的選択
+ではなく同点内にランダム性を残すことで「偶然」の手触りを保っている。
 
-```
-score = W_UNREACHED * (view_count == 0 ? 1 : 0)     -- まだ誰にも届いていない
-      + W_FIRSTPOST * (is_first_post_of_author)      -- 投稿者の初投稿
-      + W_AGE       * age                             -- 投稿からの経過時間 (0〜1)
-      + W_UNDERFED  * (max_reach - view_count) / max_reach  -- 到達の不足度
-      + W_BASE                                        -- 全候補への最低当選機会
-
--- age = least(1, extract(epoch from (now() - created_at)) / (3 * 86400))
---       期限は参照せず、経過時間だけで0〜1に正規化する（3日で頭打ち）
-```
-
-既定の重み: `W_UNREACHED=3.0`, `W_FIRSTPOST=2.0`, `W_AGE=1.5`,
-`W_UNDERFED=1.0`, `W_BASE=0.1`（すべて`distribution_config`で調整可能）。
-`age`は未到達の候補が複数あるとき、より古い投稿を優先することで特定の
-投稿だけが漂流し続けるのを防ぐ（詳細は下記「配信期限を撤廃した理由」）。
+以前（`supabase_migration_006`まで）は`unreached`/`firstpost`/`age`/
+`underfed`/`base`の5項を重み付け加算した加重ランダム抽選だったが、
+`supabase_migration_007_theme_and_view_order.sql`で単純な`view_count`
+昇順に置き換えた。`distribution_config`の重み列（`w_unreached`等）は
+残っているが、`peek_drift`からは参照されなくなっている。
 
 候補が0件なら、`is_seed=true`の投稿（運営提供のシード在庫）から
-ランダムに1件返す。それも無ければ空を返し、クライアントは
-「まだ写真が届いていません」と表示する。
+同じ`view_count`昇順ルールで1件返す。それも無ければ空を返し、
+クライアントは「まだ、流れ着いた一枚がありません」と表示する。
+
+`theme`・`created_at`も戻り値に含まれる（クライアント側のテーマ表示用、
+[data-model.md](data-model.md)参照）が、足切り・順序には一切関与しない。
 
 `peek_drift`は読み取り専用で、何度呼んでも状態は変わらない。
 
 ### 2. `confirm_drift(viewer_id, post_id)` — 現像完了時に確定
 
 `tick()`内で`developed`が`true`になった瞬間
-（[shor.html:1198-1199](../shor.html#L1198-L1199)）に、`confirmDrift()`
-（[shor.html:893-898](../shor.html#L893-L898)）から呼ばれる。
+（[shor.html:1325-1326](../shor.html#L1325-L1326)）に、`confirmDrift()`
+（[shor.html:983-988](../shor.html#L983-L988)）から呼ばれる。
 
 1. 1日の視聴上限チェック（[view-grants.md](view-grants.md)参照）。
    上限到達なら`false`を返す。
@@ -130,12 +131,12 @@ score = W_UNREACHED * (view_count == 0 ? 1 : 0)     -- まだ誰にも届いて�
 
 競合で`confirm_drift`が`false`を返すことは稀にあるが、その場合も
 クライアントは体験上そのまま鑑賞を継続させ、サーバ側の集計に反映されない
-だけの扱いとする（[shor.html:890-892](../shor.html#L890-L892)のコメント参照）。
+だけの扱いとする（[shor.html:980-982](../shor.html#L980-L982)のコメント参照）。
 
 `confirmDrift()`は非同期のfire-and-forgetで呼ぶが、指を離した際に呼ばれる
 `recordViewHistoryDB()`（`viewed_seconds`の確定更新）より先に予約行の挿入が
 終わっている必要があるため、`release()`は`confirmPromise`
-（[shor.html:1179](../shor.html#L1179), [shor.html:1232](../shor.html#L1232)）
+（[shor.html:1306](../shor.html#L1306), [shor.html:1359-1363](../shor.html#L1359-L1363)）
 の完了を待ってから確定更新を行う。UIの画面遷移演出はこの待ち合わせを
 またがない。
 
@@ -151,10 +152,14 @@ score = W_UNREACHED * (view_count == 0 ? 1 : 0)     -- まだ誰にも届いて�
 配信期限は不要と判断した。期限をなくすことで「流れ着かなかった」という
 ネガティブな結果状態をユーザー体験から排除する。
 
-期限による強制的な打ち切りの代わりに、スコアの`age`項（未到達の候補の
-中で古いものを優先する）で自然に消化されるようにしている
-（上記「1. `peek_drift`」参照）。`status`のenumも`active`/`exhausted`の
-2値のみになり、`expired`は完全に廃止した。
+期限による強制的な打ち切りの代わりに、`view_count`昇順の配信順
+（上記「1. `peek_drift`」参照）そのものが、未到達の投稿を常に最優先で
+消化する仕組みになっている。当初（`supabase_migration_006`時点）は
+スコアの`age`項（未到達の候補の中で古いものを緩やかに優先する）で
+これを実現していたが、`supabase_migration_007_theme_and_view_order.sql`
+で配信順を`view_count`昇順に一本化した際、より直接的にこの役目を
+果たすようになったため`age`項は不要になった。`status`のenumも
+`active`/`exhausted`の2値のみになり、`expired`は完全に廃止した。
 
 ## 物理削除（プライバシー要件、配信ロジックとは別系統）
 
@@ -172,8 +177,8 @@ score = W_UNREACHED * (view_count == 0 ? 1 : 0)     -- まだ誰にも届いて�
 - ただし「`peek_drift`が候補を返した直後、クライアントに画像URLが渡って
   から実際に読み込むまでの間に画像が削除される」というレースはDBトリガー
   では防げない。この隙間は`openView()`側で`imageLoads()`
-  （[shor.html:1114-1121](../shor.html#L1114-L1121)）が画像を先読みし、
-  失敗したら候補0件のときと同じ「まだ写真が届いていません」表示に
+  （[shor.html:1232-1239](../shor.html#L1232-L1239)）が画像を先読みし、
+  失敗したら候補0件のときと同じ「まだ、流れ着いた一枚がありません」表示に
   フォールバックすることでカバーしている（[screens.md](screens.md)参照）。
 
 ## シード投稿（コールドスタート対策）

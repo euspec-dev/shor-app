@@ -33,7 +33,11 @@
 ## 本番Supabaseプロジェクトの状態
 
 - [ ] `supabase_bootstrap_prod.sql`と`supabase_prod_fix_001_rls_policies.sql`
-      （およびそれ以降に追加したマイグレーション）が全て適用済み
+      （およびそれ以降に追加したマイグレーション、
+      `supabase_migration_007_theme_and_view_order.sql`まで）が全て適用済み
+      （`peek_drift`の戻り値の型が変わるため、`drop function`を含む。
+      適用後は`peek_drift`の候補選択が`view_count`昇順になっていることを
+      本番でも実際の閲覧で確認する）
 - [ ] テスト投稿・テストユーザー・テスト画像が本番DB/ストレージに残っていない
       （`posts` / `view_history` / `users` / Storageの`photos`バケットを
       ダッシュボードで目視確認）

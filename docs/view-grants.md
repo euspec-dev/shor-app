@@ -19,29 +19,29 @@
 
 ## クライアント側の実装（localStorage）
 
-- `freeUsedToday()` / `useFreeGrant()` （[shor.html:1015-1016](../shor.html#L1015-L1016)）
+- `freeUsedToday()` / `useFreeGrant()` （[shor.html:1106-1107](../shor.html#L1106-L1107)）
   `localStorage` の `shor:viewFreeUsed` に「無料枠を使った日付（`appDayStr()`、
   後述）」を保存する。値が今日の`appDayStr()`と一致していれば「今日はもう
   無料枠を使った」と判定する。
 - `postGrants()` / `addPostGrant()` / `consumePostGrant()`
-  （[shor.html:1018-1031](../shor.html#L1018-L1031)）
+  （[shor.html:1109-1122](../shor.html#L1109-L1122)）
   `localStorage` の `shor:postGrants` に `{date, count, granted}`
   （`date`は`appDayStr()`）を保存する。`addPostGrant()` は投稿成功時
-  （[shor.html:1566](../shor.html#L1566)、`createPost` 成功直後）に呼ばれる
+  （[shor.html:1713](../shor.html#L1713)、`createPost` 成功直後）に呼ばれる
   が、その日すでに `granted:true` なら何もしない — **同じ日に何通投稿しても、
   投稿ボーナスは+1しか増えない。**
-- `canView()` （[shor.html:1032](../shor.html#L1032)）
+- `canView()` （[shor.html:1123](../shor.html#L1123)）
   `!freeUsedToday() || postGrants() > 0`。無料枠が未消費、または投稿枠の残数が
   あれば閲覧可能。ボタンを押せるかどうかの入り口の判定にのみ使う。
-- `consumeView()` （[shor.html:1033-1036](../shor.html#L1033-L1036)）
+- `consumeView()` （[shor.html:1124-1127](../shor.html#L1124-L1127)）
   無料枠が未消費ならまず無料枠を消費し、消費済みなら投稿枠を1つ消費する。
   **無料枠が優先的に消費される。**
 
 ### 消費されるタイミング: 現像が完了した瞬間
 
-`consumeView()` は「誰かの感性に触れる」を押した時点（＝画面を開いた時点）
+`consumeView()` は「届いた一通を見る」を押した時点（＝画面を開いた時点）
 ではなく、**現像インタラクションが完了した瞬間**に呼ばれる
-（[shor.html:1198-1199](../shor.html#L1198-L1199)、`tick()` 内で
+（[shor.html:1325-1326](../shor.html#L1325-L1326)、`tick()` 内で
 `developed` が `true` になる箇所）。
 
 写真を開いただけで長押しをやめて離脱した場合は枠を消費しない。実際に
@@ -53,12 +53,12 @@
 2つのRPCに分けてある。
 
 1. **`peek_drift(viewer_id)`** （候補を選ぶだけ、副作用なし）
-   写真を開いた瞬間 `getRandomDrift()`（[shor.html:1143](../shor.html#L1143)）
+   写真を開いた瞬間 `getRandomDrift()`（[shor.html:1262](../shor.html#L1262)）
    から呼ばれる。加重ランダムで候補を選んで返すだけで、`view_count` の増分も
    `view_history` への記録も一切行わない。何度呼んでも状態は変わらない。
 2. **`confirm_drift(viewer_id, post_id)`** （現像完了時に呼ぶ、ここで確定）
-   `confirmDrift()`（[shor.html:893-898](../shor.html#L893-L898)）から、
-   `tick()` 内で `developed` が `true` になった瞬間（[shor.html:1199](../shor.html#L1199)）
+   `confirmDrift()`（[shor.html:983-988](../shor.html#L983-L988)）から、
+   `tick()` 内で `developed` が `true` になった瞬間（[shor.html:1326](../shor.html#L1326)）
    に呼ばれる。ここで初めて:
    - 1日の視聴上限チェック（後述）
    - 対象投稿がまだ有効か（`peek` から時間が経っている間に上限到達/期限切れ/
@@ -73,7 +73,7 @@
 confirmDrift() の呼び出しは非同期（fire-and-forget）だが、現像完了直後に
 指を離した際に呼ばれる `recordViewHistoryDB()`（`viewed_seconds` の確定更新）
 より先に `view_history` の予約行が挿入されている必要があるため、
-`release()`（[shor.html:1232-1236](../shor.html#L1232-L1236)）は
+`release()`（[shor.html:1359-1363](../shor.html#L1359-L1363)）は
 `confirmDrift()` の完了を待ってから `recordViewHistoryDB()` を呼ぶよう
 順序を保証している。UI側の画面遷移（washed演出など）はこの待ち合わせを
 またずに即座に始まる。
@@ -85,24 +85,24 @@ confirmDrift() の呼び出しは非同期（fire-and-forget）だが、現像�
 写真を開いただけで現像せずに離脱すると、クライアントの枠は減らないのに
 サーバ側は既にその日の視聴回数としてカウント済み、という矛盾が起きていた
 （例: 無料枠が残っていると表示されるのに、次に開こうとするとサーバ側の
-上限判定に引っかかって「まだ写真が届いていません」という誤解を招く表示になる）。
+上限判定に引っかかって「まだ、流れ着いた一枚がありません」という誤解を招く表示になる）。
 peek/confirmに分離し、どちらも「現像完了」という同じ瞬間に合わせたことで
 このズレを解消している。
 
 ### リセットのタイミング: 深夜0時ではなく朝7時
 
-`appDayStr()` （[shor.html:837-840](../shor.html#L837-L840)）が「アプリ内の
+`appDayStr()` （[shor.html:901-904](../shor.html#L901-L904)）が「アプリ内の
 1日」の文字列を作る。**現在時刻から7時間引いた時点の日付**をその日として
 扱う実装（`APP_DAY_SHIFT_MS = 7 * 60 * 60 * 1000`）で、端末の**ローカル
 時刻**基準。つまり無料枠・投稿枠のリセットは「ローカル時間の朝7時」を境に
 起こり、深夜0時〜6時59分はまだ前日として扱われる。`appYesterdayStr()`
-（[shor.html:841-845](../shor.html#L841-L845)）は同じ区切りでの前日を返す。
+（[shor.html:905-909](../shor.html#L905-L909)）は同じ区切りでの前日を返す。
 
 以前は`todayStr()`（深夜0時区切り）を使っていたが、「1日の区切りが深夜0時
 だと、寝る前・寝起きの生活リズムと合わない」という理由で朝7時区切りに変更した。
 `freeUsedToday`/`postGrants`系の関数（`appDayStr()`を直接使う）だけでなく、
-`renderHome()`の前日結果判定（[shor.html:1055](../shor.html#L1055)）・
-`getResultForDate()`の集計期間（[shor.html:951-975](../shor.html#L951-L975)、
+`renderHome()`の前日結果判定（[shor.html:1148](../shor.html#L1148)）・
+`getResultForDate()`の集計期間（[shor.html:1042-1066](../shor.html#L1042-L1066)、
 後述）・devbar（`dev-yesterday`/`dev-skip`）まで、**日付境界に関わる箇所は
 全て`appDayStr()`/`appYesterdayStr()`に統一**してある。
 
@@ -115,18 +115,18 @@ peek/confirmに分離し、どちらも「現像完了」という同じ瞬間�
 
 ## 上限に達したときのUI
 
-`canView() === false` のとき、押した場所によって2箇所で分岐する
-（どちらも同じ文言判定ロジック）。
+`canView() === false` のときの扱いは、画面によって異なる（[screens.md](screens.md)の
+「ホーム画面の状態分岐」参照）。
 
-- ホーム画面「誰かの感性に触れる」（[shor.html:1809-1821](../shor.html#L1809-L1821)）
-- 投稿完了画面「誰かの感性に触れる」（[shor.html:1694-1700](../shor.html#L1694-L1700)）
-
-その日すでに投稿済み（`postGrants` が `granted:true`）かどうかで文言が変わる。
-
-| 状況 | 表示文言 |
-|---|---|
-| 投稿済みで両方使い切った | 「未開封のボトルメールは以上です。朝7時に、次の一通が流れ着きます。」 |
-| 未投稿で無料枠を使い切った | 「ボトルメールは1日1通だけ届きます。自分のボトルメールを海に流すと、追加で1通だけ届きます。」 |
+- **ホーム画面**（`#btn-see`、[shor.html:1170-1187](../shor.html#L1170-L1187)）:
+  `renderHome()`が状態を見て`disabled`属性と文言を宣言的に切り替える。
+  モーダルは出さず、ボタン自体が「次の一通は、明日の朝に」という無効化
+  表示になる。以前あった「投稿済みかどうかで文言を変える」分岐は廃止した
+  （`postGrants`の`granted`有無を見ずに、`canView()`の真偽だけで決まる）
+- **投稿完了画面**「届いた一通を見る」（`#btn-give2see`、
+  [shor.html:1841-1847](../shor.html#L1841-L1847)）: こちらは変更なし。
+  クリック時に`canView()`を判定し、`false`なら`notice-modal`で
+  「今日のボトルメールは以上です　朝7時に、次の一通が流れ着きます」と表示する
 
 これはあくまで「ボタンを押せるか」の入り口の判定であり、実際に枠が減るのは
 前述の通り現像完了時点である。
