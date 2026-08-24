@@ -1,7 +1,7 @@
 # 現像インタラクション（長押し）
 
 scr-view画面で、ブラウザ写真のポラロイドを「現像」するための長押し操作の
-実装。コードは[shor.html:1304-1392](../shor.html#L1304-L1392)にまとまっている。
+実装。コードは[shor.html:1303-1391](../shor.html#L1303-L1391)にまとまっている。
 枠の消費・サーバ側の予約タイミングとの関係は[view-grants.md](view-grants.md)・
 [distribution.md](distribution.md)を参照。ここでは操作そのものの状態遷移を扱う。
 
@@ -16,16 +16,16 @@ scr-view画面で、ブラウザ写真のポラロイドを「現像」するた
 | `confirmPromise` | 現像完了時に発火した`confirmDrift()`のPromise（`release()`が待ち合わせに使う） |
 | `noteTimer` | 「離すのが早すぎる」ナグメッセージの自動非表示タイマー |
 
-`resetDevelop(hard)`（[shor.html:1309-1318](../shor.html#L1309-L1318)）が
+`resetDevelop(hard)`（[shor.html:1308-1317](../shor.html#L1308-L1317)）が
 これらを初期状態に戻す。`hard=true`は新しい写真を開いたとき
 （`openView()`内）、`hard=false`は現像未完了のまま指を離したときに使う
 （`hard=false`では下部の案内テキストは消さない）。
 
 ## 押している間: `tick(now)`
 
-`DEVELOP_MS = 5000`（[shor.html:894](../shor.html#L894)）で正規化した
+`DEVELOP_MS = 5000`（[shor.html:895](../shor.html#L895)）で正規化した
 進捗`t`（0〜1）から、`e = 1 - (1-t)^2`という減速イージングを作り、
-写真のぼかしと粒度を滑らかに解いていく（[shor.html:1320-1335](../shor.html#L1320-L1335)）。
+写真のぼかしと粒度を滑らかに解いていく（[shor.html:1319-1334](../shor.html#L1319-L1334)）。
 
 ```
 blur      : 26px → 0px          (26 * (1 - e))
@@ -50,7 +50,7 @@ frost透明度: 1   → 0            (1 - e)
 
 ## 押し始め: `pointerdown`
 
-`zone.setPointerCapture(e.pointerId)`（[shor.html:1340](../shor.html#L1340)）
+`zone.setPointerCapture(e.pointerId)`（[shor.html:1339](../shor.html#L1339)）
 でポインタをキャプチャし、指がゾーンの外に出てもイベントを取り続けられる
 ようにしている（＝押している間にスクロール等で指がずれても`pointerup`を
 確実に拾える）。`leaving`中（wash演出中）は新しい押下を無視する。
@@ -65,7 +65,7 @@ frost透明度: 1   → 0            (1 - e)
 1. `leaving = true`にして以降の押下を無視
 2. `confirmPromise`の完了を待ってから`recordViewHistoryDB()`で
    `viewed_seconds`を確定更新する非同期処理を(待たずに)開始する
-   （[shor.html:1360-1364](../shor.html#L1360-L1364)。UIのwash演出はこれを
+   （[shor.html:1359-1363](../shor.html#L1359-L1363)。UIのwash演出はこれを
    待たずに即座に始まる — 詳細は[distribution.md](distribution.md)の
    「peek → confirm」節）
 3. ポラロイドに`washed`クラス付与と同時に、案内文（`#view-screen-note`）の
@@ -90,7 +90,7 @@ frost透明度: 1   → 0            (1 - e)
 `shor.html`全体で長押しメニュー・選択・ドラッグ保存を無効化している。
 CSS側（[shor.html:59-68](../shor.html#L59-L68)）で
 `user-select`/`touch-callout`/`user-drag`等を`none`にし、その上でJS側
-（[shor.html:1087-1088](../shor.html#L1087-L1088)、`contextmenu`/`selectstart`/
+（[shor.html:1088-1089](../shor.html#L1088-L1089)、`contextmenu`/`selectstart`/
 `dragstart`の`preventDefault`）が「最終防衛線」として二重に無効化している。
 これは現像ゾーンの長押しがOS標準のコンテキストメニューやテキスト選択と
 衝突しないようにするための、アプリ全体にかかる前提。
