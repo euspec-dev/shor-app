@@ -1,7 +1,7 @@
 # 画面遷移
 
 `shor.html`には4つの`.screen`セクションがあり、`show(id)`
-（[shor.html:1048](../shor.html#L1048)）が`.active`クラスを付け替えることで
+（[shor.html:1049](../shor.html#L1049)）が`.active`クラスを付け替えることで
 1画面だけを表示する（CSSのフェードは[shor.html:111-119](../shor.html#L111-L119)）。
 現像インタラクション（長押し）そのものの詳細は
 [develop-interaction.md](develop-interaction.md)を参照。
@@ -22,40 +22,53 @@ scr-viewへの入り口が2つ（home起点/post起点）あるのが従来と�
 
 ## scr-home（画面1: ダッシュボード）
 
-- 表示関数: `renderHome()`（[shor.html:1138-1207](../shor.html#L1138-L1207)）
+- 表示関数: `renderHome()`（[shor.html:1139-1206](../shor.html#L1139-L1206)）
 - 呼ばれるタイミング: 起動時、および各画面の「ホームへ」
   （`post-to-top`が`canView()`falseのとき, `done-to-top`）
 - `pendingResults`（前日以前の投稿で未確認の結果、配列）は毎回計算するが、
   自動でモーダルを出す・画面遷移をブロックすることはしない
   （`withResultGate()`は廃止済み）。結果は下記「しらせ帯」からのみ開く
 
-DOM上の並び順は `#home-a` → `#home-to-post`（主ボタン、常時） →
+DOM上の並び順は `#home-a`（説明文、常時） → `#home-to-post`（主ボタン、常時） →
 `#home-notice`（しらせ帯） → `#btn-see`（状態テキスト）。テーマ表示は
 ホームには置かない（投稿画面・閲覧画面のみに表示、[data-model.md](data-model.md)
 の「投稿テーマ」参照）。
 
-### 状態分岐（3状態、互いに排他的）
+### 説明文（`#home-a`）
 
-`localStorage`の`shor:myPosts`が空かどうかと`canView()`だけで決まる
-（新しいlocalStorageキーは追加していない）。
+`myPosts`の空・非空にかかわらず常時表示する（新しいlocalStorageキーは
+追加していない）。以前は初回訪問時（`myPosts`が空）だけの表示だったが、
+毎回表示するよう変更した。4段落構成で、段落の区切りは変えていない。
+
+常時表示になったことで、`#home-a`＋`#home-notice`（しらせ帯）＋`#btn-see`
+が同時に表示される状態（投稿済み、かつ未確認の結果あり）が縦方向に最も
+長くなる。iPhone SE相当（375×667）でこの最悪ケースを確認したところ主ボタン
+より下がわずかに画面をはみ出したため、`p.passage`の`line-height`を`2.3`
+（グローバル既定）から`2`へ、`p.passage + p.passage`の`margin-top`を
+`2.4em`から`2em`へ詰めて収めた（[shor.html:124-125](../shor.html#L124-L125)）。
+文言の短縮・削除では対応していない。
+
+### 状態分岐（`#btn-see`、2状態）
+
+`myPosts`が空かどうかと`canView()`で決まる。
 
 | 条件 | 表示 |
 |---|---|
-| `myPosts`が空（一度も投稿していない） | 既存の説明文（`#home-a`）を表示 |
-| `myPosts`が空でなく`canView()`が`true` | `#home-a`を隠し、`#btn-see`に「1通、流れ着いています」（クリック可） |
-| `myPosts`が空でなく`canView()`が`false` | `#home-a`を隠し、`#btn-see`に「次の一通は、明日の朝に」（`disabled`） |
+| `myPosts`が空（一度も投稿していない） | `#btn-see`は非表示 |
+| `myPosts`が空でなく`canView()`が`true` | `#btn-see`に「1通、流れ着いています」（クリック可） |
+| `myPosts`が空でなく`canView()`が`false` | `#btn-see`に「次の一通は、明日の朝に」（`disabled`） |
 
 `#btn-see`は「届いた一通を見る」ボタンを兼ねている（統合済み）。
 `disabled`な`<button>`は`click`イベントが発火しないため、クリック
 ハンドラ側は`canView()`を再チェックせず無条件で`openView("home")`する
-（[shor.html:1960](../shor.html#L1960)）。以前あった「投稿済みかどうかで
+（[shor.html:1959](../shor.html#L1959)）。以前あった「投稿済みかどうかで
 文言を変える」`notice-modal`分岐は、ホーム画面については廃止した
 （[view-grants.md](view-grants.md)の「上限に達したときのUI」参照）。
 
 ### 主ボタン（`#home-to-post`）
 
 3状態とも「写真を流す」で固定・位置も変えない。クリックで`openPost()`を
-直接呼ぶ（[shor.html:1856](../shor.html#L1856)、`withResultGate`のラップは廃止）。
+直接呼ぶ（[shor.html:1855](../shor.html#L1855)、`withResultGate`のラップは廃止）。
 
 ### しらせ帯（`#home-notice`）
 
@@ -68,7 +81,7 @@ DOM上の並び順は `#home-a` → `#home-to-post`（主ボタン、常時） �
   レガシー保留分は`thumb`が無いためサムネイルに含まれない
 - 秒数はここには出さない。タップするまで伏せる
 - タップで`showNextResult()`を呼び、`result-modal`を開く
-  （[shor.html:1857](../shor.html#L1857)。既存の関数をそのまま使う。
+  （[shor.html:1856](../shor.html#L1856)。既存の関数をそのまま使う。
   下記「結果モーダル」節参照）
 - `noticeStripPulse`という`opacity:.55⇔1`のCSSアニメーション（2.6s、
   `ease-in-out infinite`）を常時付けており、点滅ではなく透明度が緩やかに
@@ -79,22 +92,22 @@ DOM上の並び順は `#home-a` → `#home-to-post`（主ボタン、常時） �
 
 ## scr-view（画面2: 閲覧/現像）
 
-- 表示関数: `openView(origin)`（[shor.html:1242](../shor.html#L1242)）。
+- 表示関数: `openView(origin)`（[shor.html:1241](../shor.html#L1241)）。
   `origin`は`"home"`か`"done"`で、現像後にどちらへ戻るかを覚えておくために使う
 - `peek_drift`で候補が0件だった場合、または候補は返ってきたが
   `drift.image_url`の読み込みに失敗した場合（ストレージから画像が手動削除
   された直後など、`imageLoads()`で先読みチェックしている
-  [shor.html:1233-1240](../shor.html#L1233-L1240) / [shor.html:1265](../shor.html#L1265)）:
+  [shor.html:1232-1239](../shor.html#L1232-L1239) / [shor.html:1264](../shor.html#L1264)）:
   どちらも同じ扱いで、まず`origin==="done"`なら`backToDone()`、それ以外は
   `renderHome()`で先に画面を戻してから、`notice-modal`
-  （[shor.html:1271-1272](../shor.html#L1271-L1272)）で「まだ、流れ着いた一枚がありません
+  （[shor.html:1270-1271](../shor.html#L1270-L1271)）で「まだ、流れ着いた一枚がありません
   あなたが最初の一人になりませんか」と知らせる（壊れた画像をそのまま
   表示することはない）。以前は画面下部固定の`whisper()`を使っていたが、
   `backToDone()`で投稿完了画面に戻った直後だと同じく画面下部にある
   `#pwa-note`（PWA案内）と文字が重なる事故があったため、先に画面遷移を
   済ませてからモーダルで知らせる方式に変更した
 - 候補の取得に成功すると、写真がすぐには見えず前置き演出を挟む
-  （[shor.html:1287-1300](../shor.html#L1287-L1300)）:
+  （[shor.html:1286-1299](../shor.html#L1286-L1299)）:
   1. 1250ms後、前置きメッセージ「誰かのボトルメールが、流れ着きました」がフェードイン
   2. 3300ms後、そのメッセージがフェードアウトし始める
   3. 4500ms後（メッセージのフェードアウトが完全に終わってから）、
@@ -139,7 +152,7 @@ DOM上の並び順は `#home-a` → `#home-to-post`（主ボタン、常時） �
     分離し、`rollGo`の25%→100%区間は単一のイージングのまま`sheetOpen`と
     完全に同期させている
   - 演出中（`.rolling`クラスが付いている間、[shor.html:278](../shor.html#L278)、
-    JS側は[shor.html:1292-1300](../shor.html#L1292-L1300)）は`.frost`の
+    JS側は[shor.html:1291-1299](../shor.html#L1291-L1299)）は`.frost`の
     `backdrop-filter`を無効化する。WebKitは`backdrop-filter`を持つ要素の
     背景ぼかし層を祖先の`clip-path`で切り取れないことがあり、無効化しないと
     巻紙が完全に閉じていてもぼかしガラス層だけが筒の外にはみ出て見えることが
@@ -173,18 +186,18 @@ DOM上の並び順は `#home-a` → `#home-to-post`（主ボタン、常時） �
   - 上記の1250/3300/4500msは、あくまで「いつ演出を開始するか」のタイミング
 - 現像インタラクション完了（長押しをやり切って指を離す）後、washのアニメーション
   を経て:
-  - `origin==="done"`（[shor.html:1380](../shor.html#L1380)）→ `renderHome()`
+  - `origin==="done"`（[shor.html:1379](../shor.html#L1379)）→ `renderHome()`
     （→scr-home）。投稿完了画面経由で見た場合も、現像後は投稿完了画面には
     戻らずホームへ抜ける（意図的な仕様。「候補0件」で見られなかった場合の
-    `backToDone()`分岐（[shor.html:1271](../shor.html#L1271)）とは扱いが違う点に注意）
-  - それ以外 → `openPost()`（[shor.html:1381](../shor.html#L1381)、→scr-post）。
+    `backToDone()`分岐（[shor.html:1270](../shor.html#L1270)）とは扱いが違う点に注意）
+  - それ以外 → `openPost()`（[shor.html:1380](../shor.html#L1380)、→scr-post）。
     `origin`が`"post"`（scr-postから直接見に来た場合）もこちらに含まれる
 - 長押しを最後までやり切らずに離した場合はこの画面に留まり、同じ写真に
   再挑戦できる（`resetDevelop(false)`、[develop-interaction.md](develop-interaction.md)参照）
 
 ## scr-post（画面3: 投稿）
 
-- 表示関数: `openPost()`（[shor.html:1598-1620](../shor.html#L1598-L1620)）
+- 表示関数: `openPost()`（[shor.html:1597-1619](../shor.html#L1597-L1619)）
 - 呼ばれるタイミング: scr-homeの「写真を流す」、scr-viewでの現像完了後
   （閲覧起点がhomeの場合）、scr-doneの「もう一枚流す」
   （`btn-post-again`）
@@ -202,14 +215,14 @@ DOM上の並び順は `#home-a` → `#home-to-post`（主ボタン、常時） �
 - 戻る導線（`post-to-top`）は`openPost()`が毎回`canView()`を見て文言を
   切り替える。`true`なら「届いた一通を見る」で押すと`openView("post")`
   （→scr-view）、`false`なら「ホームへ」で押すと`renderHome()`
-  （[shor.html:1850-1854](../shor.html#L1850-L1854)）
+  （[shor.html:1849-1853](../shor.html#L1849-L1853)）
 - `myPosts`が空（一度も投稿していない）のときだけ、`#post-photo`に
   `#post-dummy`（薄い見本写真＋見本キャプション、`DUMMY_PHOTO_URL`/
-  `DUMMY_CAPTION`定数、[shor.html:936-939](../shor.html#L936-L939)。
+  `DUMMY_CAPTION`定数、[shor.html:937-940](../shor.html#L937-L940)。
   いずれも仮の値で、本番実装時に差し替え用の画像・文言を要確認）を重ねる。
   `pointer-events:none`なので`btn-pick`の操作は妨げない。実際に写真を
   選ぶと`handlePickedFile()`が`#post-dummy`を`hidden`にする
-  （[shor.html:1681](../shor.html#L1681)）。ダミー画像・キャプションは
+  （[shor.html:1680](../shor.html#L1680)）。ダミー画像・キャプションは
   `pickedDataUrl`/`adjust`を一切経由しない別要素のため、送信データに
   含まれることは構造的に無い
 - キャプション欄（`#cap-input`）は`maxlength="15"`。実際の文字数上限も
@@ -229,7 +242,7 @@ DOM上の並び順は `#home-a` → `#home-to-post`（主ボタン、常時） �
 2本指操作は距離比だけを見てスケールに変換するため、角度成分はそもそも
 計算に登場しない）。
 
-**DOM構成**（`#post-photo`, [shor.html:780-791](../shor.html#L780-L791)）:
+**DOM構成**（`#post-photo`, [shor.html:781-792](../shor.html#L781-L792)）:
 `.photo`直下に`#post-blur`（常に枠を`cover`で覆う固定のぼかし背景、
 `filter:blur(20px)` + 縁漏れ防止の`scale(1.1)`、[shor.html:557-562]
 (../shor.html#L557-L562)）と`#post-adjust`（実際に動かす`<img>`本体、
@@ -251,9 +264,9 @@ scale(scale)`（`transform-origin:0 0`）だけで位置・大きさを表す。
   これは以前の「選ぶと自動でcoverに配置される」見た目を初期状態として
   引き継いだ形
 
-`startAdjust(dataUrl)`（[shor.html:1433-1458](../shor.html#L1433-L1458)）が
+`startAdjust(dataUrl)`（[shor.html:1432-1457](../shor.html#L1432-L1457)）が
 画像選択直後にこの初期状態を計算し、`resetAdjust()`
-（[shor.html:1460-1470](../shor.html#L1460-L1470)）が`resetPostForm()`から
+（[shor.html:1459-1469](../shor.html#L1459-L1469)）が`resetPostForm()`から
 呼ばれて調整状態（ズーム・位置・ぼかし背景・ジェスチャー状態）を初期化する
 （撮り直し・送信完了後のフォームリセット時）。
 
@@ -266,7 +279,7 @@ scale(scale)`（`transform-origin:0 0`）だけで位置・大きさを表す。
 ドラッグ位置がズレて見える不具合があった（修正済み）。
 
 **ジェスチャー**（`snapshotGesture()`/`updateGesture()`,
-[shor.html:1477-1514](../shor.html#L1477-L1514)、`pointerdown`/`pointermove`/
+[shor.html:1476-1513](../shor.html#L1476-L1513)、`pointerdown`/`pointermove`/
 `pointerup`/`pointercancel`は[shor.html:1515-1533]
 (../shor.html#L1515-L1533)）: ジェスチャー開始時点（指の本数が変わるたび）
 の状態を1つのスナップショットに固定し、以後の`pointermove`はそこからの
@@ -275,14 +288,14 @@ scale(scale)`（`transform-origin:0 0`）だけで位置・大きさを表す。
 し、ピンチの中点が指す画像上の点が常に同じ位置に留まるよう`tx`/`ty`を
 再計算する（標準的なピンチズームの中心固定アンカー）。角度は一度も計算しない
 ため、回転が混入する余地が構造的に無い。PC確認用に`wheel`イベントでの
-ズームも付けてある（[shor.html:1537-1549](../shor.html#L1537-L1549)、任意
+ズームも付けてある（[shor.html:1536-1548](../shor.html#L1536-L1548)、任意
 機能）。撮り直しボタン（`.pick.picked`、枠の右下に重なる）へのタップは
 `e.target.closest(".pick")`で判定してジェスチャーとして拾わないようにして
 いる。
 
 **送信時の書き出し**（`cropAdjusted(outSize)`,
-[shor.html:1554-1583](../shor.html#L1554-L1583)、`btn-send`から呼ばれる
-[shor.html:1707](../shor.html#L1707)）: 元画像や位置情報は保存せず、
+[shor.html:1553-1582](../shor.html#L1553-L1582)、`btn-send`から呼ばれる
+[shor.html:1706](../shor.html#L1706)）: 元画像や位置情報は保存せず、
 投稿画面で見えている見た目（ぼかし背景＋その上の本体写真）をそのまま
 1枚の正方形JPEG（既定1080×1080）に焼き込んでアップロードする。手順は
 canvasに(1)ぼかし背景を`.post-blur`と同じcover+`scale(1.1)`相当で全面描画
@@ -292,7 +305,7 @@ canvasに(1)ぼかし背景を`.post-blur`と同じcover+`scale(1.1)`相当で�
 ラクション）はこの変更の影響を受けない。
 
 - 送信（`btn-send`）API成功後: `playSendoff()`
-  （[shor.html:1734-1771](../shor.html#L1734-L1771)）を呼び、
+  （[shor.html:1733-1770](../shor.html#L1733-L1770)）を呼び、
   送り出し演出（下記）を再生してから`openDone()`を呼び、フォームを
   リセットする。API失敗時は演出を再生せず、エラー文言のみ表示する
 
@@ -308,7 +321,7 @@ JS側は再生開始と合計`SENDOFF_TOTAL_MS`（6.8秒）後の後始末しか
 （[shor.html:364-480](../shor.html#L364-L480)）。
 
 後始末は2段階に分かれている（`playSendoff()`,
-[shor.html:1734-1771](../shor.html#L1734-L1771)）。`SENDOFF_TOTAL_MS`後、
+[shor.html:1733-1770](../shor.html#L1733-L1770)）。`SENDOFF_TOTAL_MS`後、
 `openDone()`と`overlay`の後始末は即座に行うが、`.sendoff-stage`の
 `play`クラス解除だけは、その内側の1250ms後のsetTimeout
 （`resetPostForm()`と同じタイミング）まで遅らせている。`.play`を外すと
@@ -389,7 +402,7 @@ setTimeoutにまとめていたが、そうすると画面自体の`--dur-fade`�
 3. **ボトル画像がフェードイン**（3.2〜4.0s。`rotate(-3deg)`固定、
    `scale .97→1`）: `.sendoff-bottle`内は自作SVGではなく背景透過の実写画像
    `bottle.png`（`<img src="bottle.png" alt="" width="190">`,
-   [shor.html:804-806](../shor.html#L804-L806)）。`.sendoff-bottle`自体の
+   [shor.html:805-807](../shor.html#L805-L807)）。`.sendoff-bottle`自体の
    `opacity`/`transform`アニメーションと`filter:drop-shadow`は変更しておらず、
    drop-shadowは透過画像の輪郭に沿って効く
 4. **ボトルが漂いながら退場**（4.0〜6.4s）: `translate(58px,-50px)`の
@@ -405,7 +418,7 @@ setTimeoutにまとめていたが、そうすると画面自体の`--dur-fade`�
 います」というメッセージを別途フェードインさせ、数秒静止してから遷移
 していたが、この文言専用のステップ（`#sendoff-message`）は廃止した。
 現在は同じ文言を投稿完了画面（scr-done）の`.done-main`先頭の常設テキスト
-として表示している（`<p class="passage">`、[shor.html:815](../shor.html#L815)）。
+として表示している（`<p class="passage">`、[shor.html:816](../shor.html#L816)）。
 これにより演出の総時間も10秒から6.8秒に短縮された。
 
 `prefers-reduced-motion: reduce`環境では、`.sendoff-stage.play`を
@@ -422,8 +435,8 @@ setTimeoutにまとめていたが、そうすると画面自体の`--dur-fade`�
 
 ## scr-done（画面4: 投稿完了）
 
-- 表示関数: `openDone()`（[shor.html:1832](../shor.html#L1832)、投稿直後）
-  / `backToDone()`（[shor.html:1833-1840](../shor.html#L1833-L1840)、閲覧起点がdoneで
+- 表示関数: `openDone()`（[shor.html:1831](../shor.html#L1831)、投稿直後）
+  / `backToDone()`（[shor.html:1832-1839](../shor.html#L1832-L1839)、閲覧起点がdoneで
   かつ候補0件だったときのみ使用。`done-body`のpendingクラスを一旦外して
   再アニメーションできる状態に戻す。現像を最後までやり切った場合は
   `renderHome()`でscr-homeに抜けるため、この関数は呼ばれない）
@@ -442,19 +455,19 @@ setTimeoutにまとめていたが、そうすると画面自体の`--dur-fade`�
     通常のレイアウトの高さ計算に参加しないようにしてあり、押下前後で
     `#pwa-note`やボタンの位置が動かないようにしている
     （[shor.html:195-206](../shor.html#L195-L206)、JS側は
-    [shor.html:1859-1893](../shor.html#L1859-L1893)）
+    [shor.html:1858-1892](../shor.html#L1858-L1892)）
 
 ## モーダル（画面遷移ではなく重ね表示）
 
 `.screen`とは別に、現在の画面の上に重ねて出すモーダルが3つある
-（`showModal()`/`hideModal()`, [shor.html:1932-1938](../shor.html#L1932-L1938)）。
+（`showModal()`/`hideModal()`, [shor.html:1931-1937](../shor.html#L1931-L1937)）。
 
 - `result-modal`（投稿結果） — 以前は`withResultGate()`が`pendingResults`
   （前日以前に投稿してまだ結果を見せていない投稿の配列、古い順）を見て
   ボタン操作をブロックし自動的に開いていたが、この仕組みは廃止した。
   現在は**scr-homeの「しらせ帯」（`#home-notice`）をタップしたときだけ**
   開く（上記scr-home節参照）。中身は`showNextResult()`
-  （[shor.html:1209-1223](../shor.html#L1209-L1223)）が`pendingResults`から
+  （[shor.html:1208-1222](../shor.html#L1208-L1222)）が`pendingResults`から
   1件popして描画する:
   - `#result-sec`に秒数（`view_history.viewed_seconds`の合計、
     `getResultForPost()`で投稿単位に集計）
@@ -474,7 +487,7 @@ setTimeoutにまとめていたが、そうすると画面自体の`--dur-fade`�
   先送りされ、実際に1人以上に見られた後、最初にアプリを開いたときに初めて
   結果が表示される。表示される秒数は必ず1秒以上になる。
 
-  モーダルを閉じる（`closeResultModal()`, [shor.html:1940-1945](../shor.html#L1940-L1945)）
+  モーダルを閉じる（`closeResultModal()`, [shor.html:1939-1944](../shor.html#L1939-L1944)）
   たびに`pendingResults`が残っていれば次の1件を表示し、無くなって初めて
   閉じたままになる（以前あった「閉じた後に本来のアクションへ進む」
   `afterResultAction`の仕組みは、画面遷移を一切ブロックしなくなったため
@@ -506,10 +519,10 @@ PWAをホーム画面から開くと、OSがネットワークに問い合わせ
 
 - `document.lastModified`（現在表示中のHTMLが読み込まれた時点の
   `Last-Modified`ヘッダー値）を起動時の基準値として保持する
-  （[shor.html:1905-1907](../shor.html#L1905-L1907)）
+  （[shor.html:1904-1906](../shor.html#L1904-L1906)）
 - フォアグラウンド復帰のたび（`visibilitychange`が`visible`、または
   `pageshow`の`persisted`）、`checkForUpdate()`
-  （[shor.html:1908-1922](../shor.html#L1908-L1922)）が無キャッシュの`HEAD`
+  （[shor.html:1907-1921](../shor.html#L1907-L1921)）が無キャッシュの`HEAD`
   リクエストで自分自身の最新の`Last-Modified`を取得し、基準値より新しければ
   画面上部に固定表示のバナー`#update-banner`
   （[shor.html:637-644](../shor.html#L637-L644)）を出す

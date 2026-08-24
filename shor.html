@@ -121,8 +121,8 @@ body{
 #scr-done{max-height:100%;height:100%}
 
 /* 指示テキスト（案内文）: 11px / 400 — 読みやすさと繊細さの均衡 */
-p.passage{font-size:11px;font-weight:400;letter-spacing:.22em;color:var(--ink-mist)}
-p.passage + p.passage{margin-top:2.4em}
+p.passage{font-size:11px;font-weight:400;letter-spacing:.22em;color:var(--ink-mist);line-height:2}
+p.passage + p.passage{margin-top:2em}
 .small{font-size:10px;font-weight:300;color:var(--ink-faint);letter-spacing:.2em}
 .em{color:#f4f0e7}
 
@@ -135,12 +135,12 @@ p.passage + p.passage{margin-top:2.4em}
 .theme-note .theme-text{margin-top:.6em;font-size:13px;font-weight:400;
   letter-spacing:.3em;text-indent:.3em;color:var(--ink-mist)}
 
-/* ホーム画面の状態分岐（#home-a／#btn-see／#home-notice は互いに排他的に
-   表示する。切り替えはrenderHome()が担う）。並び順は
-   #home-a → #home-to-post（主ボタン、常時） → #home-notice（しらせ帯） →
-   #btn-see。#btn-seeは「届いた一通を見る」ボタンを兼ねる（統合済み）。
-   myPosts空のときは非表示、canView()がtrueなら文言「1通、流れ着いています」
-   ＋クリック可、falseなら「次の一通は、明日の朝に」＋disabled */
+/* ホーム画面のDOM順は #home-a（説明文、常時表示） → #home-to-post
+   （主ボタン、常時） → #home-notice（しらせ帯） → #btn-see。#btn-seeだけが
+   状態で切り替わる（切り替えはrenderHome()が担う）。#btn-seeは「届いた
+   一通を見る」ボタンを兼ねる（統合済み）。myPosts空のときは非表示、
+   canView()がtrueなら文言「1通、流れ着いています」＋クリック可、
+   falseなら「次の一通は、明日の朝に」＋disabled */
 .home-status{appearance:none;background:transparent;border:none;cursor:pointer;
   font:inherit;color:var(--ink-mist);font-size:12px;font-weight:400;
   letter-spacing:.18em;text-indent:.18em;padding:0;margin-top:1.8em;text-align:center;
@@ -696,10 +696,11 @@ footer a{color:inherit;text-decoration:none;border-bottom:1px solid rgba(207,201
 
   <!-- ============ 画面1: ダッシュボード ============ -->
   <section class="screen" id="scr-home" aria-label="ホーム">
-    <div id="home-a" hidden>
+    <div id="home-a">
       <p class="passage">見せるほどじゃない。でも、伝えたい。</p>
-      <p class="passage">その一枚を、ボトルメールのように<br>知らない誰かへ流せます。</p>
-      <p class="passage">いいねも、フォロワーもありません。</p>
+      <p class="passage">ここに置けるのは、今までSNSでは出しづらかった一枚。<br>誰かから評価されるためではない、<br>でも誰かと共有したい。<br>そんな一枚を、ボトルメールのように流してみてください。</p>
+      <p class="passage">誰が撮ったかも、誰が見たかも、わかりません。<br>誰かの評価を気にすることもありません。</p>
+      <p class="passage">あなたの一枚がどう受け取られたか、<br>あとでそっとしらせをお届けします。</p>
     </div>
     <button class="btn" id="home-to-post" type="button" style="margin-top:1.8em">写真を流す</button>
     <div class="notice-strip" id="home-notice" hidden>
@@ -1168,15 +1169,13 @@ async function renderHome(){
     pendingResults.push({ postId: p.id, seconds, thumb: p.thumb || null });
   }
 
-  /* ホームの状態分岐（3状態、互いに排他的）。myPosts空＝初回説明文。
-     それ以外はcanView()で2状態に分岐し、#btn-see（「届いた一通を見る」
-     ボタンを兼ねる）の文言とdisabledを切り替える。 */
-  const homeA = $("home-a"), status = $("btn-see");
+  /* ホームの状態分岐（2状態）。#home-aは常時表示。#btn-seeはmyPostsが
+     空でない場合のみ表示し、canView()で（「届いた一通を見る」ボタンを
+     兼ねる）文言とdisabledを切り替える。 */
+  const status = $("btn-see");
   if (myPosts.length === 0){
-    homeA.hidden = false;
     status.hidden = true;
   } else {
-    homeA.hidden = true;
     status.hidden = false;
     if (canView()){
       status.textContent = "1通、流れ着いています";
