@@ -704,6 +704,7 @@ footer a{color:inherit;text-decoration:none;border-bottom:1px solid rgba(207,201
 <div id="devbar" aria-label="開発用">
   <button type="button" id="dev-yesterday">前日投稿</button>
   <button type="button" id="dev-skip">一日進める</button>
+  <button type="button" id="dev-theme-preview">テーマ閲覧</button>
   <button type="button" id="dev-reset">リセット</button>
 </div>
 
@@ -1240,7 +1241,7 @@ function imageLoads(url){
   });
 }
 
-async function openView(origin){
+async function openView(origin, forcedDrift){
   viewOrigin = origin;
 
   /* 先に画面を表示してからフェッチ */
@@ -1267,13 +1268,14 @@ async function openView(origin){
   /* home起点（#btn-see「浜辺を見に行く」）だけ、閲覧枠が無い時点でpeek_drift
      すら呼ばずに画面内で案内する。post/doneはそれぞれ自分でcanView()を
      確認済みでここには来ない（postはcanView() trueのときだけこの関数を呼び、
-     doneはbtn-give2see側でnotice-modalに弾く） */
-  if (origin === "home" && !canView()){
+     doneはbtn-give2see側でnotice-modalに弾く）。forcedDrift指定時
+     （開発バーのダミープレビュー用）はこのチェック自体を丸ごとスキップする */
+  if (!forcedDrift && origin === "home" && !canView()){
     showViewEmpty("明日の朝　潮が満ちるころに届きます");
     return;
   }
 
-  const drift = await getRandomDrift();
+  const drift = forcedDrift || await getRandomDrift();
 
   if (!drift || !(await imageLoads(drift.image_url))){
     /* drift.image_url がストレージから削除済み等で読み込めない場合も、
@@ -1995,6 +1997,18 @@ if (IS_DEV){
     store.set("lastPostDate", appYesterdayStr());
     store.set("resultConfirmed:" + appYesterdayStr(), false);
     location.reload();
+  });
+  /* テーマ表示の見た目確認用。実DBには触れず、今日のthemeFor()を積んだ
+     ダミーのdriftをopenView()に直接渡す（peek_drift・canView()チェックは
+     forcedDrift指定時に丸ごとスキップされる）。写真はbottle.pngを流用 */
+  $("dev-theme-preview").addEventListener("click", () => {
+    openView("home", {
+      id: null,
+      image_url: "bottle.png",
+      message: "開発用ダミー投稿",
+      theme: themeFor(),
+      created_at: new Date().toISOString(),
+    });
   });
   $("dev-reset").addEventListener("click", () => {
     Object.keys(localStorage)
