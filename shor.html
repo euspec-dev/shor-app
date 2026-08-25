@@ -123,6 +123,10 @@ body{
 /* 指示テキスト（案内文）: 11px / 400 — 読みやすさと繊細さの均衡 */
 p.passage{font-size:11px;font-weight:400;letter-spacing:.22em;color:var(--ink-mist);line-height:2}
 p.passage + p.passage{margin-top:2em}
+/* ホーム説明文の1〜2段落目だけを上へ視覚的にずらし、背景写真の水平線が
+   段落間の空白（この下の3段落目との間）に来るようにする。position:relativeは
+   レイアウト上の占有幅を変えないため、3・4段落目やボタンの位置には影響しない */
+.home-a-rise{position:relative;top:-56px}
 .small{font-size:10px;font-weight:300;color:var(--ink-faint);letter-spacing:.2em}
 .em{color:#f4f0e7}
 
@@ -135,17 +139,18 @@ p.passage + p.passage{margin-top:2em}
 .theme-note .theme-text{margin-top:.6em;font-size:13px;font-weight:400;
   letter-spacing:.3em;text-indent:.3em;color:var(--ink-mist)}
 
-/* ホーム画面のDOM順は #home-a（説明文、常時表示） → #home-to-post
-   （主ボタン、常時） → #home-notice（しらせ帯） → #btn-see。#btn-seeだけが
-   状態で切り替わる（切り替えはrenderHome()が担う）。#btn-seeは「届いた
-   一通を見る」ボタンを兼ねる（統合済み）。myPosts空のときは非表示、
-   canView()がtrueなら文言「1通、流れ着いています」＋クリック可、
-   falseなら「次の一通は、明日の朝に」＋disabled */
-.home-status{appearance:none;background:transparent;border:none;cursor:pointer;
-  font:inherit;color:var(--ink-mist);font-size:12px;font-weight:400;
-  letter-spacing:.18em;text-indent:.18em;padding:0;margin-top:1.8em;text-align:center;
-  transition:opacity .4s ease}
-.home-status:disabled{cursor:default;color:var(--ink-faint)}
+/* 閲覧画面（scr-view）で写真が無いときの案内。閲覧枠切れ（canView() false）
+   と在庫切れ（peek_driftがnull）の両方で使う。波・砂浜の背景演出はそのまま
+   （非表示にするのは.unroll-stageと#view-screen-noteだけ）。モーダルではなく
+   画面内に表示し、ここから離脱する手段としてホームへの導線を添える */
+.view-empty{margin-top:3.6em}
+#view-empty .to-top{margin-top:2.4em}
+
+/* ホーム画面のDOM順は #home-a（説明文、常時表示） → #home-notice（しらせ帯） →
+   #home-to-post（主ボタン） → #btn-see（副ボタン）。主・副ボタンは間隔を
+   詰めて1組に見せる（.btn.secondary参照）。#btn-seeの文言は「浜辺を見に
+   行く」で固定、myPosts/canView()による出し分けはしない。常時表示・常時
+   押下可（canView()がfalseのときの案内はopenView()側、閲覧画面内で行う） */
 /* しらせ帯（未確認の結果があるときだけ表示）。サムネイルは重なり表示で
    最大3件、それ以上は積んでもサムネイルを増やさない（件数はテキスト側で
    表現しない仕様のため、4件目以降があっても見た目は3件のまま）。
@@ -153,10 +158,16 @@ p.passage + p.passage{margin-top:2em}
    目立たせる（世界観に合わせ、急激な変化は避ける）。非表示中（hidden→
    display:none）はアニメーションも走らない */
 .notice-strip{display:flex;align-items:center;justify-content:center;gap:10px;
-  cursor:pointer;margin-top:1.8em;padding:9px 16px;
+  cursor:pointer;margin-top:1.2em;padding:7px 16px;
   border:1px solid rgba(236,231,220,.18);border-radius:2px;
   background:rgba(236,231,220,.05);transition:background-color .4s ease;
   animation:noticeStripPulse 2.6s ease-in-out infinite}
+#home-to-post{margin-top:3em}
+/* しらせ帯が実際に表示されているとき（#home-a＋しらせ帯＋ボタン対が全部
+   並ぶ最も縦に長い状態）だけ、主ボタンの上マージンを詰める。狭い画面
+   （iPhone SE等）でフッターと重ならないようにするための調整で、しらせ帯が
+   無い通常時は上の3emをそのまま使う */
+.notice-strip:not([hidden]) + #home-to-post{margin-top:.6em}
 .notice-strip[hidden]{display:none}
 .notice-strip:hover{background:rgba(236,231,220,.1)}
 @keyframes noticeStripPulse{
@@ -186,6 +197,9 @@ h2.quiet{font-size:10px;letter-spacing:.55em;color:var(--ink-faint);
 .btn:disabled{opacity:.3;cursor:default;background:transparent}
 .btn.ghost{border-color:transparent;color:var(--ink-faint);font-size:10px;font-weight:300;padding:10px 24px}
 .btn.ghost:hover{color:var(--ink-mist)}
+/* 副ボタン（#btn-see「浜辺を見に行く」）。主ボタンと同じ形状のまま、枠線の
+   不透明度だけ下げて従属して見せる。margin-topを詰めて主ボタンと1組にする */
+.btn.secondary{border-color:rgba(245,241,232,.14);margin-top:.3em}
 
 /* 完了画面: 2ボタンを横並びに。狭い画面では字間とpaddingを詰めて収める */
 .done-actions{display:flex;gap:12px;justify-content:center;margin-top:3.2em}
@@ -697,17 +711,17 @@ footer a{color:inherit;text-decoration:none;border-bottom:1px solid rgba(207,201
   <!-- ============ 画面1: ダッシュボード ============ -->
   <section class="screen" id="scr-home" aria-label="ホーム">
     <div id="home-a">
-      <p class="passage">見せるほどじゃない。でも、伝えたい。</p>
-      <p class="passage">ここに置けるのは、今までSNSでは出しづらかった一枚。<br>誰かから評価されるためではない、<br>でも誰かと共有したい。<br>そんな一枚を、ボトルメールのように流してみてください。</p>
+      <p class="passage home-a-rise">見せるほどじゃない。でも、伝えたい。</p>
+      <p class="passage home-a-rise">ここに置けるのは、今までSNSでは出しづらかった一枚。<br>誰かから評価されるためではない、<br>でも誰かと共有したい。<br>そんな一枚を、ボトルメールのように流してみてください。</p>
       <p class="passage">誰が撮ったかも、誰が見たかも、わかりません。<br>誰かの評価を気にすることもありません。</p>
       <p class="passage">あなたの一枚がどう受け取られたか、<br>あとでそっとしらせをお届けします。</p>
     </div>
-    <button class="btn" id="home-to-post" type="button" style="margin-top:1.8em">写真を流す</button>
     <div class="notice-strip" id="home-notice" hidden>
       <div class="notice-strip-thumbs" id="home-notice-thumbs"></div>
       <span>しらせが届いています</span>
     </div>
-    <button class="home-status" id="btn-see" hidden></button>
+    <button class="btn" id="home-to-post" type="button">写真を流す</button>
+    <button class="btn secondary" id="btn-see" type="button">浜辺を見に行く</button>
   </section>
 
   <!-- ============ 画面2: 閲覧（現像） ============ -->
@@ -716,6 +730,10 @@ footer a{color:inherit;text-decoration:none;border-bottom:1px solid rgba(207,201
     <div class="theme-note" id="view-theme" hidden>
       <p class="theme-label" id="view-theme-label"></p>
       <p class="theme-text" id="view-theme-text"></p>
+    </div>
+    <div class="view-empty" id="view-empty" hidden>
+      <p class="passage" id="view-empty-text"></p>
+      <button class="to-top" id="view-empty-to-top" type="button">ホームへ</button>
     </div>
     <div class="unroll-stage" id="view-unroll-stage">
       <div class="polaroid-shadow">
@@ -815,7 +833,7 @@ footer a{color:inherit;text-decoration:none;border-bottom:1px solid rgba(207,201
       <div class="done-main">
         <p class="passage">あなたの一枚が、誰かの岸へ向かっています<br>早ければ明日の朝、しらせが届きます</p>
         <div class="done-actions">
-          <button class="btn" id="btn-give2see">届いた一通を見る</button>
+          <button class="btn" id="btn-give2see">流れ着いた一通を見る</button>
           <button class="btn" id="btn-post-again">もう一枚流す</button>
         </div>
         <button class="to-top" id="done-to-top" type="button" style="margin-top:1.8em;padding-top:0">ホームへ</button>
@@ -1169,23 +1187,6 @@ async function renderHome(){
     pendingResults.push({ postId: p.id, seconds, thumb: p.thumb || null });
   }
 
-  /* ホームの状態分岐（2状態）。#home-aは常時表示。#btn-seeはmyPostsが
-     空でない場合のみ表示し、canView()で（「届いた一通を見る」ボタンを
-     兼ねる）文言とdisabledを切り替える。 */
-  const status = $("btn-see");
-  if (myPosts.length === 0){
-    status.hidden = true;
-  } else {
-    status.hidden = false;
-    if (canView()){
-      status.textContent = "1通、流れ着いています";
-      status.disabled = false;
-    } else {
-      status.textContent = "次の一通は、明日の朝に";
-      status.disabled = true;
-    }
-  }
-
   /* しらせ帯: 未確認の結果（pendingResults）が1件以上あるときだけ表示する。
      サムネイルはthumbを持つものだけ古い順に最大3件（レガシーな日付単位の
      保留分はthumbを持たないためサムネイルには出ない）。秒数はここには
@@ -1257,16 +1258,34 @@ async function openView(origin){
   unrollStage.classList.remove("play");
   void unrollStage.offsetWidth;
   snote.classList.add("pending");
+  unrollStage.hidden = false;
+  snote.hidden = false;
+  $("view-empty").hidden = true;
   show("scr-view");
+
+  /* home起点（#btn-see「浜辺を見に行く」）だけ、閲覧枠が無い時点でpeek_drift
+     すら呼ばずに画面内で案内する。post/doneはそれぞれ自分でcanView()を
+     確認済みでここには来ない（postはcanView() trueのときだけこの関数を呼び、
+     doneはbtn-give2see側でnotice-modalに弾く） */
+  if (origin === "home" && !canView()){
+    showViewEmpty("明日の朝　潮が満ちるころに届きます");
+    return;
+  }
 
   const drift = await getRandomDrift();
 
   if (!drift || !(await imageLoads(drift.image_url))){
     /* drift.image_url がストレージから削除済み等で読み込めない場合も、
        候補0件のときと同じ扱いにして「黒画像」を見せない。
-       whisper()は画面下部固定のため、backToDone()で投稿完了画面に戻った
-       直後だとPWA案内(#pwa-note)と重なってしまう。先に画面遷移してから
-       モーダルで知らせることで、どの画面に戻っても重ならないようにする */
+       home起点は画面内にそのまま案内を表示し、post/doneは従来通り画面を
+       戻してからモーダルで知らせる（whisper()は画面下部固定のため、
+       backToDone()で投稿完了画面に戻った直後だとPWA案内(#pwa-note)と
+       重なってしまう。先に画面遷移してからモーダルで知らせることで、
+       どの画面に戻っても重ならないようにする） */
+    if (origin === "home"){
+      showViewEmpty("まだ、流れ着いた一枚がありません<br>あなたが最初の一人になりませんか");
+      return;
+    }
     if (viewOrigin === "done") backToDone(); else renderHome();
     openNotice("まだ、流れ着いた一枚がありません<br>あなたが最初の一人になりませんか");
     return;
@@ -1298,6 +1317,17 @@ async function openView(origin){
     introTimers.push(setTimeout(() => unrollStage.classList.remove("rolling"), 4100));
   }, 4500));
 }
+
+/* 写真が無い状態のscr-view（閲覧枠切れ・在庫切れ）。openView("home")からのみ
+   呼ばれる。波・砂浜の背景はそのまま、.unroll-stageと#view-screen-noteだけ
+   隠して案内文＋ホームへの導線に差し替える */
+function showViewEmpty(html){
+  $("view-empty-text").innerHTML = html;
+  $("view-unroll-stage").hidden = true;
+  $("view-screen-note").hidden = true;
+  $("view-empty").hidden = false;
+}
+$("view-empty-to-top").addEventListener("click", () => renderHome());
 
 /* ---- 現像インタラクション ---- */
 const zone = $("dev-zone"), pic = $("view-pic"),
@@ -1374,7 +1404,8 @@ function release(){
       snote.classList.remove("fading");
       snote.classList.add("pending");
       snote.textContent = "※写真の保存はご遠慮ください";
-      void snote.offsetWidth;
+      void sno
+      te.offsetWidth;
       snote.style.transition = "";
       if (viewOrigin === "done") renderHome();
       else openPost();
@@ -1600,7 +1631,7 @@ function openPost(){
   $("post-theme-text").textContent = `「${themeFor()}」`;
   /* 戻る導線: 閲覧可能なら閲覧画面へ誘導、不可なら通常のホームへ戻る
    （動作はpost-to-topのclickハンドラ側、canView()で分岐） */
-  $("post-to-top").textContent = canView() ? "届いた一通を見る" : "ホームへ";
+  $("post-to-top").textContent = canView() ? "流れ着いた一通を見る" : "ホームへ";
   /* myPosts空（一度も投稿していない）ときだけ、見本写真・見本キャプションを
      薄く重ねる。写真を選んだ瞬間にhandlePickedFile()側で消す */
   if (store.get("myPosts", []).length === 0){
@@ -1954,8 +1985,8 @@ $("notice-modal").addEventListener("click", e => {
   if (e.target === $("notice-modal")) closeNotice();
 });
 
-/* renderHome()がcanView()===falseのとき既にdisabledにしているため、
-   ここでは無条件にopenViewしてよい（disabledなbuttonはclickが発火しない） */
+/* 常時押下可（文言・disabledの出し分けはしない）。canView()がfalseの場合の
+   案内はopenView()側、閲覧画面に入ってから画面内で行う */
 $("btn-see").addEventListener("click", () => openView("home"));
 
 /* ===== 開発テスト用（IS_DEVでのみ有効。本番configでは devbar 自体を除去する） ===== */
