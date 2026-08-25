@@ -126,7 +126,7 @@ p.passage + p.passage{margin-top:2em}
 /* ホーム説明文の1〜2段落目だけを上へ視覚的にずらし、背景写真の水平線が
    段落間の空白（この下の3段落目との間）に来るようにする。position:relativeは
    レイアウト上の占有幅を変えないため、3・4段落目やボタンの位置には影響しない */
-.home-a-rise{position:relative;top:-56px}
+.home-a-rise{position:relative;top:-32px}
 .small{font-size:10px;font-weight:300;color:var(--ink-faint);letter-spacing:.2em}
 .em{color:#f4f0e7}
 
@@ -158,7 +158,7 @@ p.passage + p.passage{margin-top:2em}
    目立たせる（世界観に合わせ、急激な変化は避ける）。非表示中（hidden→
    display:none）はアニメーションも走らない */
 .notice-strip{display:flex;align-items:center;justify-content:center;gap:10px;
-  cursor:pointer;margin-top:1.2em;padding:7px 16px;
+  cursor:pointer;margin-top:.9em;padding:6px 16px;
   border:1px solid rgba(236,231,220,.18);border-radius:2px;
   background:rgba(236,231,220,.05);transition:background-color .4s ease;
   animation:noticeStripPulse 2.6s ease-in-out infinite}
@@ -167,7 +167,7 @@ p.passage + p.passage{margin-top:2em}
    並ぶ最も縦に長い状態）だけ、主ボタンの上マージンを詰める。狭い画面
    （iPhone SE等）でフッターと重ならないようにするための調整で、しらせ帯が
    無い通常時は上の3emをそのまま使う */
-.notice-strip:not([hidden]) + #home-to-post{margin-top:.6em}
+.notice-strip:not([hidden]) + #home-to-post{margin-top:.1em}
 .notice-strip[hidden]{display:none}
 .notice-strip:hover{background:rgba(236,231,220,.1)}
 @keyframes noticeStripPulse{
@@ -199,7 +199,8 @@ h2.quiet{font-size:10px;letter-spacing:.55em;color:var(--ink-faint);
 .btn.ghost:hover{color:var(--ink-mist)}
 /* 副ボタン（#btn-see「浜辺を見に行く」）。主ボタンと同じ形状のまま、枠線の
    不透明度だけ下げて従属して見せる。margin-topを詰めて主ボタンと1組にする */
-.btn.secondary{border-color:rgba(245,241,232,.14);margin-top:.3em}
+.btn.secondary{border-color:rgba(245,241,232,.14);margin-top:1.2em}
+#home-to-post, #btn-see{width:190px}
 
 /* 完了画面: 2ボタンを横並びに。狭い画面では字間とpaddingを詰めて収める */
 .done-actions{display:flex;gap:12px;justify-content:center;margin-top:3.2em}
