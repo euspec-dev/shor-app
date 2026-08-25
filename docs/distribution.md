@@ -86,7 +86,7 @@ update distribution_config set k_default = 4;
 
 ### 1. `peek_drift(viewer_id)` — 候補を選ぶだけ（副作用なし）
 
-写真を開いた瞬間、`getRandomDrift()`（[shor.html:979-983](../shor.html#L979-L983)）
+写真を開いた瞬間、`getRandomDrift()`（[shor.html:980-984](../shor.html#L980-L984)）
 から呼ばれる。以下の**足切り**を満たす投稿だけを候補にする。
 
 1. `status = 'active'`
@@ -118,8 +118,8 @@ random() limit 1`）で並べ、先頭の1件を返す。まだ誰にも見ら�
 ### 2. `confirm_drift(viewer_id, post_id)` — 現像完了時に確定
 
 `tick()`内で`developed`が`true`になった瞬間
-（[shor.html:1325-1326](../shor.html#L1325-L1326)）に、`confirmDrift()`
-（[shor.html:988-993](../shor.html#L988-L993)）から呼ばれる。
+（[shor.html:1327-1328](../shor.html#L1327-L1328)）に、`confirmDrift()`
+（[shor.html:989-994](../shor.html#L989-L994)）から呼ばれる。
 
 1. 1日の視聴上限チェック（[view-grants.md](view-grants.md)参照）。
    上限到達なら`false`を返す。
@@ -131,12 +131,12 @@ random() limit 1`）で並べ、先頭の1件を返す。まだ誰にも見ら�
 
 競合で`confirm_drift`が`false`を返すことは稀にあるが、その場合も
 クライアントは体験上そのまま鑑賞を継続させ、サーバ側の集計に反映されない
-だけの扱いとする（[shor.html:985-987](../shor.html#L985-L987)のコメント参照）。
+だけの扱いとする（[shor.html:986-988](../shor.html#L986-L988)のコメント参照）。
 
 `confirmDrift()`は非同期のfire-and-forgetで呼ぶが、指を離した際に呼ばれる
 `recordViewHistoryDB()`（`viewed_seconds`の確定更新）より先に予約行の挿入が
 終わっている必要があるため、`release()`は`confirmPromise`
-（[shor.html:1306](../shor.html#L1306), [shor.html:1359-1363](../shor.html#L1359-L1363)）
+（[shor.html:1308](../shor.html#L1308), [shor.html:1361-1365](../shor.html#L1361-L1365)）
 の完了を待ってから確定更新を行う。UIの画面遷移演出はこの待ち合わせを
 またがない。
 
@@ -177,7 +177,7 @@ random() limit 1`）で並べ、先頭の1件を返す。まだ誰にも見ら�
 - ただし「`peek_drift`が候補を返した直後、クライアントに画像URLが渡って
   から実際に読み込むまでの間に画像が削除される」というレースはDBトリガー
   では防げない。この隙間は`openView()`側で`imageLoads()`
-  （[shor.html:1232-1239](../shor.html#L1232-L1239)）が画像を先読みし、
+  （[shor.html:1233-1240](../shor.html#L1233-L1240)）が画像を先読みし、
   失敗したら候補0件のときと同じ「まだ、流れ着いた一枚がありません」表示に
   フォールバックすることでカバーしている（[screens.md](screens.md)参照）。
 

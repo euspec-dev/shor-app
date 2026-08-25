@@ -2,7 +2,7 @@
 
 Supabase (Postgres + Storage) 上の実体。認証は無く、匿名UUID
 （`localStorage`の`shor:uid`）がそのままユーザーIDとして使われる
-（[shor.html:942-955](../shor.html#L942-L955)）。
+（[shor.html:943-956](../shor.html#L943-L956)）。
 
 ### なぜiOSだけ別のmanifestを使うのか
 
@@ -43,20 +43,20 @@ Safari標準UIが表示され、フルスクリーンのネイティブアプリ
   `Date.now()`（ミリ秒epoch）、`thumb`は長辺240px・JPEG品質0.5の
   サムネイルdataURL
 - 書き込み: `btnSend`のクリックハンドラ内、`createPost()`成功直後
-  （[shor.html:1710-1712](../shor.html#L1710-L1712)）。サムネイルは
-  `makeThumb(finalDataUrl, 240, .5)`（[shor.html:1814-1826](../shor.html#L1814-L1826)）
+  （[shor.html:1712-1714](../shor.html#L1712-L1714)）。サムネイルは
+  `makeThumb(finalDataUrl, 240, .5)`（[shor.html:1816-1828](../shor.html#L1816-L1828)）
   で生成する。`finalDataUrl`は投稿本体のアップロードにも使う
   `cropAdjusted()`（[screens.md](screens.md)の「投稿写真の拡大縮小・移動調整」
   節参照）の出力そのもので、`downscale()`（写真選択直後の縮小用）とは別の
   軽量版。既にJPEG化済みのdataURLを再度縮小するだけなのでFile/Blobを
   経由しない
-- 掃除: `pruneMyPostThumbs()`（[shor.html:1009-1013](../shor.html#L1009-L1013)）が
+- 掃除: `pruneMyPostThumbs()`（[shor.html:1010-1014](../shor.html#L1010-L1014)）が
   起動時に`STORAGE_EXPIRE_MS`（30日）より古いエントリを削除する。
   `cleanupOldPosts()`（サーバ側の投稿本体の掃除）とは別関数だが、
   同じ期限・同じタイミング（起動時）で走らせている
 - 読み出し: `renderHome()`が起動の度に`shor:myPosts`を読み、まだ結果を
   見せていない前日以前の投稿について`getResultForPost(postId)`
-  （[shor.html:1079-1085](../shor.html#L1079-L1085)）で`view_history`の
+  （[shor.html:1080-1086](../shor.html#L1080-L1086)）で`view_history`の
   `viewed_seconds`合計を取得する。`view_history`に行が無い（＝まだ誰にも
   見られていない）場合は`null`を返し、結果モーダルには出さず無言で
   先送りする（`resultConfirmed`フラグも立てない）。詳細は
@@ -68,7 +68,7 @@ Safari標準UIが表示され、フルスクリーンのネイティブアプリ
 
 | カラム | 型 | 備考 |
 |---|---|---|
-| `id` | uuid (PK) | クライアントが`genUUID()`（[shor.html:946-953](../shor.html#L946-L953)）で生成し、以後永続化する匿名ID |
+| `id` | uuid (PK) | クライアントが`genUUID()`（[shor.html:947-954](../shor.html#L947-L954)）で生成し、以後永続化する匿名ID |
 | `last_active_at` | timestamptz | `initUser()`が起動の度にupsertする |
 | `has_posted_ever` | boolean | 初投稿判定用。トリガーが自動更新（後述） |
 
@@ -103,12 +103,12 @@ Safari標準UIが表示され、フルスクリーンのネイティブアプリ
 投稿画面・閲覧画面それぞれに、その投稿の日の「テーマ」を表示する
 （[screens.md](screens.md)参照）。仕様は次の通り。
 
-- `THEMES`（[shor.html:920-929](../shor.html#L920-L929)）: 30個の固定文言の
+- `THEMES`（[shor.html:921-930](../shor.html#L921-L930)）: 30個の固定文言の
   配列。**並び順を変更・削除しないこと** — 既に投稿済みの`posts.theme`は
   文字列としてそのまま保存されるため実は並び替えても過去分には影響しないが、
   `themeFor()`が将来の同じ暦日に対して常に同じテーマを返し続けるためには
   順序を保つ必要がある（末尾への追加は安全）
-- `themeFor(dayStr = appDayStr())`（[shor.html:932-935](../shor.html#L932-L935)）:
+- `themeFor(dayStr = appDayStr())`（[shor.html:933-936](../shor.html#L933-L936)）:
   `dayStr`をUTC日付として解釈し、エポックからの通算日数を`THEMES.length`
   （30）で割った余りを添字にする純関数。同じ暦日を渡せば常に同じテーマを返す
 - 投稿時、`createPost()`が`themeFor()`（引数省略＝今日）の結果を`theme`
@@ -119,6 +119,13 @@ Safari標準UIが表示され、フルスクリーンのネイティブアプリ
   （`supabase_migration_007`より前の投稿、シード投稿）の場合は
   テーマ表示ブロックごと非表示にする
 - 配信の足切り・順序には一切使わない（[distribution.md](distribution.md)参照）
+- 開発バーの「テーマ閲覧」（`IS_DEV`限定、[shor.html:2004-2012]
+  (../shor.html#L2004-L2012)）: `peek_drift`を呼ばず、`theme: themeFor()`
+  （今日のテーマ）を積んだダミーのdriftを`openView("home", forcedDrift)`
+  経由で直接閲覧画面に渡し、テーマ表示の見た目だけを実DBに触れず確認できる。
+  写真は`bottle.png`を流用（`id: null`のため、現像しても`confirmDrift()`は
+  `postId`が無く即`false`を返し、DBには何も記録されない。ただし
+  `consumeView()`によるローカルの閲覧枠消費は通常の閲覧と同様に発生する）
 
 ### view_history
 
@@ -151,11 +158,11 @@ posts 1 ──< view_history (post_id)    -- 1投稿を複数人が閲覧でき�
 ## Storage
 
 バケット名: `photos`（公開バケット）。ファイル名は`genUUID()+".jpg"`
-（[shor.html:1018](../shor.html#L1018)）。`genUUID()`は`crypto.randomUUID()`が
+（[shor.html:1019](../shor.html#L1019)）。`genUUID()`は`crypto.randomUUID()`が
 使えればそれを使い、使えない場合（`http:`のLAN IPなど非セキュアコンテキスト。
 セキュアコンテキストは`https:`または`localhost`のみで、`crypto.randomUUID`は
 そこでしか実装されていない）は`crypto.getRandomValues()`から自前でUUID v4を
-組み立てるフォールバックに切り替える（[shor.html:946-953](../shor.html#L946-L953)）。
+組み立てるフォールバックに切り替える（[shor.html:947-954](../shor.html#L947-L954)）。
 `posts.image_url`にはパスではなく
 `.../storage/v1/object/public/photos/<uuid>.jpg`という完全なURLをそのまま
 保存している。そのため画像ファイル名から`posts`行を逆引きする処理
@@ -171,16 +178,16 @@ posts 1 ──< view_history (post_id)    -- 1投稿を複数人が閲覧でき�
 変更してある。スクリーンショットはOS標準でPNG形式で保存され、カメラ写真は
 基本的にJPEG/HEICでPNGにはならない、という前提を利用している。
 
-- `isPng(buffer)`（[shor.html:1788-1794](../shor.html#L1788-L1794)）
+- `isPng(buffer)`（[shor.html:1790-1796](../shor.html#L1790-L1796)）
   PNGのシグネチャ（先頭8バイト）を見るだけの単純な判定。EXIF解析はしない。
-- `handlePickedFile(file, fromCamera)`（[shor.html:1671-1687](../shor.html#L1671-L1687)）
+- `handlePickedFile(file, fromCamera)`（[shor.html:1673-1689](../shor.html#L1673-L1689)）
   - `fromCamera=true`（`camera-input`、`capture="environment"`経由。
     Androidの自前モーダルからのみ発生）: 撮ったばかりの写真は定義上
     カメラ写真なので、中身の判定を丸ごとスキップして無条件で受け付ける
   - `fromCamera=false`（iOSは後述の理由で常にこちら。Androidはギャラリー
     経由）: `isPng()`が`true`を返したら`showPickError()`で弾く
 - **iOS**: `btn-pick`「＋ 写真を選ぶ」を押すと自前モーダルを挟まず
-  `file-input`を直接開く（[shor.html:1638-1652](../shor.html#L1638-L1652)、
+  `file-input`を直接開く（[shor.html:1640-1654](../shor.html#L1640-L1654)、
   `isIOS()`で判定）。iOS Safariは`accept="image/*"`のinputをタップすると
   OS標準で「写真を撮る/ライブラリ/ファイル」のアクションシートを出すため、
   自前モーダルを重ねると選択が二重になってしまう。この一本化により、
