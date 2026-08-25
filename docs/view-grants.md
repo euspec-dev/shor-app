@@ -27,7 +27,7 @@
   （[shor.html:1130-1143](../shor.html#L1130-L1143)）
   `localStorage` の `shor:postGrants` に `{date, count, granted}`
   （`date`は`appDayStr()`）を保存する。`addPostGrant()` は投稿成功時
-  （[shor.html:1745](../shor.html#L1745)、`createPost` 成功直後）に呼ばれる
+  （[shor.html:1744](../shor.html#L1744)、`createPost` 成功直後）に呼ばれる
   が、その日すでに `granted:true` なら何もしない — **同じ日に何通投稿しても、
   投稿ボーナスは+1しか増えない。**
 - `canView()` （[shor.html:1144](../shor.html#L1144)）
@@ -120,7 +120,7 @@ peek/confirmに分離し、どちらも「現像完了」という同じ瞬間�
 
 - **ホーム画面**（`#btn-see`「浜辺を見に行く」）: 文言・`disabled`の出し分けは
   廃止し、常時表示・常時押下可能にした。クリックで無条件に`openView("home")`
-  する（[shor.html:1991](../shor.html#L1991)）。`canView()`の判定は
+  する（[shor.html:1990](../shor.html#L1990)）。`canView()`の判定は
   `openView()`側に移り、`false`なら`peek_drift`すら呼ばずscr-view画面内で
   `showViewEmpty()`（[shor.html:1325-1330](../shor.html#L1325-L1330)）が
   「明日の朝　潮が満ちるころに届きます」と案内する
@@ -128,7 +128,7 @@ peek/confirmに分離し、どちらも「現像完了」という同じ瞬間�
   画面遷移後の常設表示で、「ホームへ」ボタンで戻る）。以前あった
   「投稿済みかどうかで文言を変える」分岐はこれより前に廃止済み
 - **投稿完了画面**「流れ着いた一通を見る」（`#btn-give2see`、
-  [shor.html:1873-1879](../shor.html#L1873-L1879)）: こちらは変更なし。
+  [shor.html:1872-1878](../shor.html#L1872-L1878)）: こちらは変更なし。
   クリック時に`canView()`を判定し、`false`なら`notice-modal`で
   「今日のボトルメールは以上です　朝7時に、次の一通が流れ着きます」と表示する
 
