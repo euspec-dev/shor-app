@@ -1,7 +1,7 @@
 # 画面遷移
 
 `shor.html`には4つの`.screen`セクションがあり、`show(id)`
-（[shor.html:1072](../shor.html#L1072)）が`.active`クラスを付け替えることで
+（[shor.html:1085](../shor.html#L1085)）が`.active`クラスを付け替えることで
 1画面だけを表示する（CSSのフェードは[shor.html:111-119](../shor.html#L111-L119)）。
 現像インタラクション（長押し）そのものの詳細は
 [develop-interaction.md](develop-interaction.md)を参照。
@@ -23,9 +23,63 @@ scr-viewへの入り口が2つ（home起点/post起点）ある。home起点だ�
 `canView()`の可否を問わず常に遷移でき、写真が用意できない場合は
 scr-view内でその旨を案内する（下記scr-view節「写真が無い状態」参照）。
 
+## レイアウトのレスポンシブ対応
+
+4画面（ホーム・投稿・受け取り・完了）いずれも、画面高600px〜950px・
+主要3機種（iPhone SE相当375×667、iPhone 15相当393×852、Android標準
+412×915）・Safari/Chromeのアドレスバー表示/非表示（実質的に画面高が
+50〜80px変動する）の組み合わせで、スクロール無しに全要素が収まることを
+Playwrightで実測して確認している。`body{overflow:hidden}`（意図的な
+no-scroll設計）のため、はみ出しは「隠れて見えなくなる」だけで、スクロール
+して見ることはできない。
+
+- **ビューポート高さ**: `#app`は`height:100vh`を先に書き、`height:100dvh`
+  で上書きする（[shor.html:107](../shor.html#L107)）。`dvh`はモバイル
+  ブラウザのアドレスバー表示/非表示に追従する動的単位、`vh`は非対応
+  ブラウザ向けのフォールバック。以降に追加した`clamp()`/`calc()`も含め、
+  画面高を参照する箇所は全て`dvh`を使っている
+- **セーフエリア**: `#app`のpadding-bottom（`calc(60px + env(safe-area-inset-bottom))`、
+  [shor.html:109](../shor.html#L109)）・footer・`#whisper`が
+  `env(safe-area-inset-bottom)`を加算済み。iPhoneのホームインジケータ
+  領域を避ける
+- **フッターの重なり**: footerは`position:fixed`のまま
+  （[shor.html:234](../shor.html#L234)）変更していない。`#app`の
+  padding-bottom（60px+セーフエリア）が元々footerの表示域を確保して
+  いるため、`.screen`側のコンテンツが`max-height:100%`
+  （[shor.html:116](../shor.html#L116)）に収まりさえすれば理屈上
+  footerと重ならない。実際にはflexboxは子要素を自動では縮めないため、
+  以下のclamp()/calc()で各画面のコンテンツ自体を縮めることで
+  この前提を成立させている（「フッターと重ならないよう個別に余白を
+  確保する」のではなく、「そもそもmax-height内に収まるようにする」
+  方針）
+- **画面高に応じて可変にした値**（すべて`clamp(MIN, calc(MIN + 差分 *
+  ((100dvh - 600px) / 350px)), MAX)`の形。600px以下でMIN、950px以上でMAX、
+  間は線形補間）:
+  - `p.passage`の`line-height`（2→1.7）・段落間`margin-top`（2em→1.3em、
+    [shor.html:126-131](../shor.html#L126-L131)）
+  - `.theme-note`の`margin-bottom`（1.8em→1em、[shor.html:140-141](../shor.html#L140-L141)）
+  - `#home-to-post`の`margin-top`（3em→1.6em、[shor.html:170](../shor.html#L170)）・
+    `.btn.secondary`の`margin-top`（1.2em→.5em、[shor.html:208-209](../shor.html#L208-L209)）
+  - `.done-actions`の`margin-top`（3.2em→1.8em、[shor.html:213-214]
+    (../shor.html#L213-L214)）・`.done-foot`の`padding-top`（3.4em→1.8em、
+    [shor.html:223-224](../shor.html#L223-L224)）・`.btn.done-pwa`の
+    `margin-top`（1.6em→.8em、[shor.html:226-227](../shor.html#L226-L227)）
+  - `.screen-note`の`padding-top`（16px→8px、[shor.html:558-560]
+    (../shor.html#L558-L560)）・`.to-top`の`padding-top`（30px→14px、
+    [shor.html:563-565](../shor.html#L563-L565)）
+- **ポラロイドの高さ基準サイズ**: `#post-polaroid`・`#view-polaroid`は
+  それぞれ`width:min(Nvw, Npx, calc(100dvh - Mpx))`の第3項で、画面幅では
+  なく利用可能な高さを基準にサイズを決める（正方形の写真枠
+  `aspect-ratio:1/1`が縦幅の大半を占めるため、幅を絞ると高さも絞れる）。
+  画面高が十分あるときは`vw`/`px`の上限が効き、厳しいときだけこの項が
+  効く。詳細・定数の内訳は各画面節の「投稿写真の拡大縮小・移動調整」
+  「巻紙が開く演出」を参照
+- 背景写真（`#shore`）・全体の世界観に関わるCSSは変更していない。
+  今回はすべて余白・サイズの調整で対応した
+
 ## scr-home（画面1: ダッシュボード）
 
-- 表示関数: `renderHome()`（[shor.html:1162-1212](../shor.html#L1162-L1212)）
+- 表示関数: `renderHome()`（[shor.html:1175-1225](../shor.html#L1175-L1225)）
 - 呼ばれるタイミング: 起動時、および各画面の「ホームへ」
   （`post-to-top`が`canView()`falseのとき, `done-to-top`）
 - `pendingResults`（前日以前の投稿で未確認の結果、配列）は毎回計算するが、
@@ -44,7 +98,7 @@ DOM上の並び順は `#home-a`（説明文、常時） → `#home-notice`（し
 追加していない）。以前は初回訪問時（`myPosts`が空）だけの表示だったが、
 毎回表示するよう変更した。4段落構成で、段落の区切りは変えていない。
 
-1〜2段落目（`.home-a-rise`クラス、[shor.html:129](../shor.html#L129)）だけ
+1〜2段落目（`.home-a-rise`クラス、[shor.html:133](../shor.html#L133)）だけ
 `position:relative;top:-32px`で視覚的に上へずらしてある。背景写真
 （`#shore`）の水平線と文章が重なって読みにくい問題への対応で、
 `position:relative`はレイアウト上の占有幅を変えないため、3・4段落目や
@@ -53,32 +107,31 @@ DOM上の並び順は `#home-a`（説明文、常時） → `#home-notice`（し
 
 常時表示になったことで、`#home-a`＋`#home-notice`（しらせ帯）＋主・副
 ボタンが同時に表示される状態（投稿済み、かつ未確認の結果あり）が縦方向に
-最も長くなる。iPhone SE相当（375×667）でこの最悪ケースを確認したところ
-固定フッター（プライバシーポリシー等）と副ボタンが重なったため、
-`p.passage`の`line-height`/`margin-top`の調整（[shor.html:124-125]
-(../shor.html#L124-L125)）に加え、しらせ帯自体の`margin-top`/`padding`
-（[shor.html:160-164](../shor.html#L160-L164)）と、しらせ帯が実際に
-表示されているときだけ主ボタンの上マージンを詰める
-`.notice-strip:not([hidden]) + #home-to-post`（[shor.html:170]
-(../shor.html#L170)、`.1em`。しらせ帯が無い通常時は
-`#home-to-post{margin-top:3em}`のまま）を用意した。文言の短縮・削除では
+最も長くなる。`p.passage`の行間・段落間余白、`#home-to-post`/
+`.btn.secondary`の`margin-top`が画面高に応じてclamp()で縮む点は上記
+「レイアウトのレスポンシブ対応」節を参照。それに加え、しらせ帯が実際に
+表示されているときだけ主ボタンの上マージンをさらに`.1em`まで詰める
+`.notice-strip:not([hidden]) + #home-to-post`（[shor.html:175]
+(../shor.html#L175)）を用意した（画面高に関わらず一律`.1em`で、
+最も縦に長くなるこの状態専用の追加の詰め）。文言の短縮・削除では
 対応していない。
 
 ### 主・副ボタン（`#home-to-post` / `#btn-see`）
 
-- 両ボタンとも`width:190px`で幅を揃えている（[shor.html:203]
-  (../shor.html#L203)）。文言の長さが違う（「写真を流す」/「浜辺を見に
+- 両ボタンとも`width:190px`で幅を揃えている（[shor.html:210]
+  (../shor.html#L210)）。文言の長さが違う（「写真を流す」/「浜辺を見に
   行く」）ため、幅を明示しないと自然幅で揃わない
 - `#home-to-post`「写真を流す」: 常時表示・文言固定。クリックで`openPost()`
-  を直接呼ぶ（[shor.html:1897](../shor.html#L1897)、`withResultGate`の
+  を直接呼ぶ（[shor.html:1910](../shor.html#L1910)、`withResultGate`の
   ラップは廃止）
 - `#btn-see`「浜辺を見に行く」: 常時表示・常時押下可能・文言固定（以前は
   `myPosts`/`canView()`で文言と`disabled`を出し分けていたが廃止）。
   `#home-to-post`と同じ`.btn`の見た目のまま、枠線の不透明度だけ下げて
-  （`.btn.secondary`、[shor.html:202](../shor.html#L202)）従属して見せて
-  いる。`margin-top`は`.btn.secondary`側で`1.2em`とやや広めに取り、
-  主ボタンとの間に十分な間隔を持たせつつ1組のペアに見せている。クリックで
-  無条件に`openView("home")`する（[shor.html:2001](../shor.html#L2001)）。
+  （`.btn.secondary`、[shor.html:208-209](../shor.html#L208-L209)）従属して
+  見せている。`margin-top`は`.btn.secondary`側で画面高600px〜950pxの
+  clamp()により`.5em`〜`1.2em`の範囲で可変にし、主ボタンとの間隔を保ちつつ
+  1組のペアに見せている。クリックで無条件に`openView("home")`する
+  （[shor.html:2014](../shor.html#L2014)）。
   `canView()`が`false`のとき、および候補が無いときの案内は、ここでは行わず
   `openView()`側・閲覧画面に入ってから画面内で行う
   （下記scr-view節「写真が無い状態」参照）
@@ -94,7 +147,7 @@ DOM上の並び順は `#home-a`（説明文、常時） → `#home-notice`（し
   レガシー保留分は`thumb`が無いためサムネイルに含まれない
 - 秒数はここには出さない。タップするまで伏せる
 - タップで`showNextResult()`を呼び、`result-modal`を開く
-  （[shor.html:1898](../shor.html#L1898)。既存の関数をそのまま使う。
+  （[shor.html:1911](../shor.html#L1911)。既存の関数をそのまま使う。
   下記「結果モーダル」節参照）
 - `noticeStripPulse`という`opacity:.55⇔1`のCSSアニメーション（2.6s、
   `ease-in-out infinite`）を常時付けており、点滅ではなく透明度が緩やかに
@@ -105,8 +158,8 @@ DOM上の並び順は `#home-a`（説明文、常時） → `#home-notice`（し
 
 ## scr-view（画面2: 閲覧/現像）
 
-- 表示関数: `openView(origin, forcedDrift)`（[shor.html:1247]
-  (../shor.html#L1247)）。`origin`は`"home"`/`"post"`/`"done"`で、現像後に
+- 表示関数: `openView(origin, forcedDrift)`（[shor.html:1244]
+  (../shor.html#L1244)）。`origin`は`"home"`/`"post"`/`"done"`で、現像後に
   どちらへ戻るかを覚えておくために使う。`forcedDrift`は省略可能で、開発
   バーの「テーマ閲覧」専用（[data-model.md](data-model.md)の「投稿テーマ」
   参照）。指定時は`peek_drift`も閲覧枠チェックも丸ごとスキップする
@@ -126,29 +179,29 @@ DOM上の並び順は `#home-a`（説明文、常時） → `#home-notice`（し
    ころに」の間は全角スペース1つ）を表示する
 2. **候補が0件、または画像読み込みに失敗**（ストレージから画像が手動削除
    された直後など、`imageLoads()`で先読みチェックしている
-   [shor.html:1238-1245](../shor.html#L1238-L1245) / [shor.html:1283]
-   (../shor.html#L1283)）: home起点なら`showViewEmpty()`で「まだ、流れ着いた
+   [shor.html:1251-1258](../shor.html#L1251-L1258) / [shor.html:1296]
+   (../shor.html#L1296)）: home起点なら`showViewEmpty()`で「まだ、流れ着いた
    一枚がありません／あなたが最初の一人になりませんか」を表示する
-   （[shor.html:1291-1294](../shor.html#L1291-L1294)）。post/doneはこれまで
+   （[shor.html:1304-1307](../shor.html#L1304-L1307)）。post/doneはこれまで
    通り、まず`origin==="done"`なら`backToDone()`、それ以外は`renderHome()`
-   で先に画面を戻してから`notice-modal`（[shor.html:1295-1296]
-   (../shor.html#L1295-L1296)）で同じ文言を知らせる（壊れた画像をそのまま
+   で先に画面を戻してから`notice-modal`（[shor.html:1308-1309]
+   (../shor.html#L1308-L1309)）で同じ文言を知らせる（壊れた画像をそのまま
    表示することはない）。以前は画面下部固定の`whisper()`を使っていたが、
    `backToDone()`で投稿完了画面に戻った直後だと同じく画面下部にある
    `#pwa-note`（PWA案内）と文字が重なる事故があったため、先に画面遷移を
    済ませてからモーダルで知らせる方式に変更した
 
-`showViewEmpty(html)`（[shor.html:1330-1335](../shor.html#L1330-L1335)）は
+`showViewEmpty(html)`（[shor.html:1343-1348](../shor.html#L1343-L1348)）は
 `.unroll-stage`と`#view-screen-note`を`hidden`にし、`#view-empty`
 （`#view-empty-text`＋「ホームへ」の`.to-top`ボタン）を表示するだけで、
 `#shore`/`#veil`（背景の砂浜・波の演出）自体には触れない。**モーダルでは
 なくscr-view内の表示**なので、`#view-empty-to-top`のクリックで
 `renderHome()`を呼ぶ以外に離脱手段が無いことに注意
-（[shor.html:1336](../shor.html#L1336)。scr-viewはこれまで候補が無い時に
+（[shor.html:1349](../shor.html#L1349)。scr-viewはこれまで候補が無い時に
 表示されること自体が無かったため、専用の「ホームへ」導線が必要になった）。
 
 - 候補の取得に成功すると、写真がすぐには見えず前置き演出を挟む
-  （[shor.html:1311-1324](../shor.html#L1311-L1324)）:
+  （[shor.html:1324-1337](../shor.html#L1324-L1337)）:
   1. 1250ms後、前置きメッセージ「誰かのボトルメールが、流れ着きました」がフェードイン
   2. 3300ms後、そのメッセージがフェードアウトし始める
   3. 4500ms後（メッセージのフェードアウトが完全に終わってから）、
@@ -161,15 +214,21 @@ DOM上の並び順は `#home-a`（説明文、常時） → `#home-notice`（し
   揃えており（中身の設定自体はもっと早い、写真URL設定と同じタイミングで
   行うが、`hidden`を外すのは巻紙の`play`クラス付与と同時）、`theme`が
   `null`（テーマ追加前の投稿・シード投稿）ならブロックごと非表示のまま
-- `#view-polaroid`は`.polaroid`共通の`width:min(86vw,350px)`より一回り
-  小さい`width:min(76vw,315px)`で上書きしている（[shor.html:249]
-  (../shor.html#L249)）。`.unroll-stage`自体の幅（[shor.html:279]
-  (../shor.html#L279)）も同じ`76vw,315px`に合わせてあるが、
-  `#view-polaroid`は`.polaroid`の幅指定を直接持つため、
-  `.unroll-stage`側だけを変えても追従しない点に注意（両方の指定が必要）。
-  テーマ表示・ポラロイド・`#view-screen-note`（下記）までがiPhone SE相当
-  （375×667）でスクロールなしに収まるようにするための調整
-- 巻紙が開く演出（`.unroll-stage`, [shor.html:274-386](../shor.html#L274-L386)）は、
+- `#view-polaroid`は`.polaroid`共通の`width:min(86vw,350px)`を
+  `width:min(76vw,315px,calc(100dvh - 385px))`で上書きしている
+  （[shor.html:259](../shor.html#L259)）。`.unroll-stage`自体の幅
+  （[shor.html:289](../shor.html#L289)）も同じ値に合わせてあるが、
+  `#view-polaroid`は`.polaroid`の幅指定を直接持つため、`.unroll-stage`側
+  だけを変えても追従しない点に注意（両方の指定が必要）。第3項
+  `calc(100dvh - 385px)`は「利用可能な画面高から、写真以外に必要な高さ
+  （テーマ・キャプション行・裾・戻る導線・上下余白など）を差し引いた
+  残り」を表す目安で、画面高が十分あるときは`76vw`/`315px`の上限が効き、
+  画面高が厳しいとき（アドレスバー表示時など）だけこの項が効いて正方形の
+  写真枠ごと縮む（幅基準ではなく高さ基準でサイズが決まる）。385という
+  定数はiPhone SE相当（375×667）〜Android標準（412×915）、画面高
+  600px（下限の目安）〜950px、Safari/Chromeのアドレスバー表示/非表示の
+  組み合わせで実測して調整した値（「レイアウトのレスポンシブ対応」節参照）
+- 巻紙が開く演出（`.unroll-stage`, [shor.html:284-396](../shor.html#L284-L396)）は、
   参考実装`shor_polaroid_unroll_v2.html`を土台に、実際のポラロイド本体
   （キャプション・ぼかし写真・現像ゾーンを含む可変高さの`#view-polaroid`）を
   `.polaroid-shadow`（影担当）＞`.polaroid-clip`（clip-path担当）で
@@ -191,7 +250,7 @@ DOM上の並び順は `#home-a`（説明文、常時） → `#home-notice`（し
     （`top:0/height:26px`）の中心は13px、終了地点（`top:calc(100% - 9px)/
     height:9px`）の中心は`calc(100% - 4.5px)`となり、`sheetOpen`は
     `inset(0 0 calc(100% - 13px) 0)`→`inset(0 0 4.5px 0)`とその補正込みの
-    値で動く（[shor.html:365-368](../shor.html#L365-L368)）。以前はこの補正が
+    値で動く（[shor.html:375-378](../shor.html#L375-L378)）。以前はこの補正が
     無く、単純に`100%`⇔`0`だったため、常に筒の中心と開口端が最大13pxずれて
     見える不具合があった
   - `rollGo`のopacityは以前は`top`/`height`と同じキーフレーム内（86%地点）
@@ -200,8 +259,8 @@ DOM上の並び順は `#home-a`（説明文、常時） → `#home-notice`（し
     動きが分離するバグがあった。opacityは`rollFade`という別animationに
     分離し、`rollGo`の25%→100%区間は単一のイージングのまま`sheetOpen`と
     完全に同期させている
-  - 演出中（`.rolling`クラスが付いている間、[shor.html:302](../shor.html#L302)、
-    JS側は[shor.html:1316-1324](../shor.html#L1316-L1324)）は`.frost`の
+  - 演出中（`.rolling`クラスが付いている間、[shor.html:312](../shor.html#L312)、
+    JS側は[shor.html:1329-1337](../shor.html#L1329-L1337)）は`.frost`の
     `backdrop-filter`を無効化する。WebKitは`backdrop-filter`を持つ要素の
     背景ぼかし層を祖先の`clip-path`で切り取れないことがあり、無効化しないと
     巻紙が完全に閉じていてもぼかしガラス層だけが筒の外にはみ出て見えることが
@@ -226,27 +285,27 @@ DOM上の並び順は `#home-a`（説明文、常時） → `#home-notice`（し
     写真の`.pic`要素側、`clip-path`は外側の`.polaroid-clip`側と別々の要素に
     分けているため、演出中に鮮明な写真が一瞬見えることはない
   - `prefers-reduced-motion: reduce`環境では、演出させずに開き切った状態へ
-    即座に切り替える（[shor.html:382-386](../shor.html#L382-L386)）
+    即座に切り替える（[shor.html:392-396](../shor.html#L392-L396)）
   - フェードイン/アウトの所要時間そのもの（前置きメッセージ・ホーム→scr-viewの
     画面遷移）は共通の`--dur-fade`（1100ms、[shor.html:52](../shor.html#L52)）を
     使っている。`--dur-fade-photo`（1600ms、[shor.html:53](../shor.html#L53)）は
     現在ポラロイドの登場には使われておらず、`washed`クラスによる退出（波に
-    さらわれる）アニメーションにのみ使われている（[shor.html:260](../shor.html#L260)）
+    さらわれる）アニメーションにのみ使われている（[shor.html:270](../shor.html#L270)）
   - 上記の1250/3300/4500msは、あくまで「いつ演出を開始するか」のタイミング
 - 現像インタラクション完了（長押しをやり切って指を離す）後、washのアニメーション
   を経て:
-  - `origin==="done"`（[shor.html:1415](../shor.html#L1415)）→ `renderHome()`
+  - `origin==="done"`（[shor.html:1428](../shor.html#L1428)）→ `renderHome()`
     （→scr-home）。投稿完了画面経由で見た場合も、現像後は投稿完了画面には
     戻らずホームへ抜ける（意図的な仕様。「候補0件」で見られなかった場合の
-    `backToDone()`分岐（[shor.html:1295](../shor.html#L1295)）とは扱いが違う点に注意）
-  - それ以外 → `openPost()`（[shor.html:1416](../shor.html#L1416)、→scr-post）。
+    `backToDone()`分岐（[shor.html:1308](../shor.html#L1308)）とは扱いが違う点に注意）
+  - それ以外 → `openPost()`（[shor.html:1429](../shor.html#L1429)、→scr-post）。
     `origin`が`"post"`（scr-postから直接見に来た場合）もこちらに含まれる
 - 長押しを最後までやり切らずに離した場合はこの画面に留まり、同じ写真に
   再挑戦できる（`resetDevelop(false)`、[develop-interaction.md](develop-interaction.md)参照）
 
 ## scr-post（画面3: 投稿）
 
-- 表示関数: `openPost()`（[shor.html:1633-1654](../shor.html#L1633-L1654)）
+- 表示関数: `openPost()`（[shor.html:1646-1667](../shor.html#L1646-L1667)）
 - 呼ばれるタイミング: scr-homeの「写真を流す」、scr-viewでの現像完了後
   （閲覧起点がhomeの場合）、scr-doneの「もう一枚流す」
   （`btn-post-again`）
@@ -268,39 +327,41 @@ DOM上の並び順は `#home-a`（説明文、常時） → `#home-notice`（し
 - 戻る導線（`post-to-top`）は`openPost()`が毎回`canView()`を見て文言を
   切り替える。`true`なら「流れ着いた一通を見る」で押すと`openView("post")`
   （→scr-view）、`false`なら「ホームへ」で押すと`renderHome()`
-  （[shor.html:1891-1895](../shor.html#L1891-L1895)）。DOM上は
+  （[shor.html:1904-1908](../shor.html#L1904-L1908)）。DOM上は
   `#sendoff-overlay`の直後（画面の一番下）にあり、`#post-polaroid`の
   すぐ下・フッターの上に位置する
 - `myPosts`が空（一度も投稿していない）のときだけ、`#post-photo`に
   `#post-dummy`（薄い見本写真＋見本キャプション、`DUMMY_PHOTO_URL`/
-  `DUMMY_CAPTION`定数、[shor.html:960-963](../shor.html#L960-L963)。
+  `DUMMY_CAPTION`定数、[shor.html:973-976](../shor.html#L973-L976)。
   いずれも仮の値で、本番実装時に差し替え用の画像・文言を要確認）を重ねる。
   `pointer-events:none`なので`btn-pick`の操作は妨げない。実際に写真を
   選ぶと`handlePickedFile()`が`#post-dummy`を`hidden`にする
-  （[shor.html:1729](../shor.html#L1729)）。ダミー画像・キャプションは
+  （[shor.html:1742](../shor.html#L1742)）。ダミー画像・キャプションは
   `pickedDataUrl`/`adjust`を一切経由しない別要素のため、送信データに
   含まれることは構造的に無い
 - キャプション欄（`#cap-input`）は`maxlength="15"`だが、IME変換中の
   未確定文字列にはこの属性が効かないため、変換確定後（`compositionend`）と
   通常入力時（`input`、非変換中のみ）に`enforceCapLimit()`
-  （[shor.html:1663-1666](../shor.html#L1663-L1666)）が`[...value]`基準
+  （[shor.html:1676-1679](../shor.html#L1676-L1679)）が`[...value]`基準
   （サロゲートペア対応）で15文字を超えた分を切り詰める。`postValid()`
-  （[shor.html:1656-1659](../shor.html#L1656-L1659)）も同じ`[...value]`基準
+  （[shor.html:1669-1672](../shor.html#L1669-L1672)）も同じ`[...value]`基準
   で15文字以下を要求する
 - カウンター（`#cap-counter`）は常時表示（`0/15`形式）。以前あった
   「残り5文字を切ってから表示」（`.show`クラスでのフェードイン）は撤去した。
   上限超過時の色変化（`.over`クラス）も、`enforceCapLimit()`により実質
   超過が起き得なくなったため撤去した（`refreshPostUI()`,
-  [shor.html:1667-1671](../shor.html#L1667-L1671)）
+  [shor.html:1680-1684](../shor.html#L1680-L1684)）
 
 ### 投稿写真の拡大縮小・移動調整
 
-`#post-polaroid`は`.polaroid`共通の`width:min(86vw,350px)`より一回り小さい
-`width:min(78vw,320px)`で上書きしている（[shor.html:244]
-(../shor.html#L244)）。テーマ表示・ポラロイド・送信ボタン・戻る導線
-（`post-to-top`）までがiPhone SE相当（375×667）でスクロールなしに収まる
-ようにするための調整で、正方形の写真枠（`aspect-ratio:1/1`）が縮む分、
-縦幅の削減効果が大きい。
+`#post-polaroid`は`.polaroid`共通の`width:min(86vw,350px)`を
+`width:min(78vw,320px,calc(100dvh - 330px))`で上書きしている
+（[shor.html:258](../shor.html#L258)）。第3項`calc(100dvh - 330px)`は
+`#view-polaroid`と同じ考え方（利用可能な画面高から写真以外に必要な高さを
+差し引いた残り）で、画面高が厳しいときだけ効いて正方形の写真枠
+（`aspect-ratio:1/1`）ごと縮む。テーマ表示・ポラロイド・送信ボタン・戻る
+導線（`post-to-top`）までが画面高600px〜950pxの範囲でスクロールなしに
+収まるようにするための調整（詳細は「レイアウトのレスポンシブ対応」節参照）。
 
 写真を選んだ後、正方形の写真枠（`.polaroid .photo`, `aspect-ratio:1/1`）の
 中でピンチ拡大縮小・ドラッグ移動ができる。以前は選んだ写真を
@@ -309,13 +370,13 @@ DOM上の並び順は `#home-a`（説明文、常時） → `#home-notice`（し
 2本指操作は距離比だけを見てスケールに変換するため、角度成分はそもそも
 計算に登場しない）。
 
-**DOM構成**（`#post-photo`, [shor.html:804-815](../shor.html#L804-L815)）:
+**DOM構成**（`#post-photo`, [shor.html:817-828](../shor.html#L817-L828)）:
 `.photo`直下に`#post-blur`（常に枠を`cover`で覆う固定のぼかし背景、
 `filter:blur(20px)` + 縁漏れ防止の`scale(1.1)`、[shor.html:577-581]
 (../shor.html#L577-L581)）と`#post-adjust`（実際に動かす`<img>`本体、
-[shor.html:583-589](../shor.html#L583-L589)）、`#post-dummy`（見本表示、
+[shor.html:596-602](../shor.html#L596-L602)）、`#post-dummy`（見本表示、
 上記参照）を重ねている。`#post-photo`自体は`touch-action:none`
-（[shor.html:576](../shor.html#L576)）でブラウザ標準のスクロール/ズームを
+（[shor.html:589](../shor.html#L589)）でブラウザ標準のスクロール/ズームを
 無効化し、ジェスチャーは全て自前実装する。
 
 **状態とスケール範囲**（`adjust`変数、[shor.html:1439-1443]
@@ -331,14 +392,14 @@ scale(scale)`（`transform-origin:0 0`）だけで位置・大きさを表す。
   これは以前の「選ぶと自動でcoverに配置される」見た目を初期状態として
   引き継いだ形
 
-`startAdjust(dataUrl)`（[shor.html:1468-1493](../shor.html#L1468-L1493)）が
+`startAdjust(dataUrl)`（[shor.html:1481-1506](../shor.html#L1481-L1506)）が
 画像選択直後にこの初期状態を計算し、`resetAdjust()`
-（[shor.html:1495-1505](../shor.html#L1495-L1505)）が`resetPostForm()`から
+（[shor.html:1508-1518](../shor.html#L1508-L1518)）が`resetPostForm()`から
 呼ばれて調整状態（ズーム・位置・ぼかし背景・ジェスチャー状態）を初期化する
 （撮り直し・送信完了後のフォームリセット時）。
 
-**移動範囲のクランプ**（`clampAdjust()`, [shor.html:1449-1462]
-(../shor.html#L1449-L1462)）: 軸ごとに独立して判定する。本体画像がその軸で
+**移動範囲のクランプ**（`clampAdjust()`, [shor.html:1462-1475]
+(../shor.html#L1462-L1475)）: 軸ごとに独立して判定する。本体画像がその軸で
 枠を覆っている（`natW*scale >= box`など）場合は「枠外に隙間が出ない範囲」で
 自由に移動でき、枠より小さく余白がある場合はその軸を中央（
 `tx = (box - natW*scale) / 2`、`ty`も同様）に固定する。以前は余白がある軸も
@@ -346,23 +407,23 @@ scale(scale)`（`transform-origin:0 0`）だけで位置・大きさを表す。
 ドラッグ位置がズレて見える不具合があった（修正済み）。
 
 **ジェスチャー**（`snapshotGesture()`/`updateGesture()`,
-[shor.html:1512-1549](../shor.html#L1512-L1549)、`pointerdown`/`pointermove`/
-`pointerup`/`pointercancel`は[shor.html:1551-1569]
-(../shor.html#L1551-L1569)）: ジェスチャー開始時点（指の本数が変わるたび）
+[shor.html:1525-1562](../shor.html#L1525-L1562)、`pointerdown`/`pointermove`/
+`pointerup`/`pointercancel`は[shor.html:1564-1582]
+(../shor.html#L1564-L1582)）: ジェスチャー開始時点（指の本数が変わるたび）
 の状態を1つのスナップショットに固定し、以後の`pointermove`はそこからの
 差分で計算する（フレームごとの積み上げ誤差を避けるため）。1本指はドラッグ
 （`tx`/`ty`を移動量ぶん加算）、2本指は指の距離の比だけをスケール変化に変換
 し、ピンチの中点が指す画像上の点が常に同じ位置に留まるよう`tx`/`ty`を
 再計算する（標準的なピンチズームの中心固定アンカー）。角度は一度も計算しない
 ため、回転が混入する余地が構造的に無い。PC確認用に`wheel`イベントでの
-ズームも付けてある（[shor.html:1572-1584](../shor.html#L1572-L1584)、任意
+ズームも付けてある（[shor.html:1585-1597](../shor.html#L1585-L1597)、任意
 機能）。撮り直しボタン（`.pick.picked`、枠の右下に重なる）へのタップは
 `e.target.closest(".pick")`で判定してジェスチャーとして拾わないようにして
 いる。
 
 **送信時の書き出し**（`cropAdjusted(outSize)`,
-[shor.html:1589-1618](../shor.html#L1589-L1618)、`btn-send`から呼ばれる
-[shor.html:1755](../shor.html#L1755)）: 元画像や位置情報は保存せず、
+[shor.html:1602-1631](../shor.html#L1602-L1631)、`btn-send`から呼ばれる
+[shor.html:1768](../shor.html#L1768)）: 元画像や位置情報は保存せず、
 投稿画面で見えている見た目（ぼかし背景＋その上の本体写真）をそのまま
 1枚の正方形JPEG（既定1080×1080）に焼き込んでアップロードする。手順は
 canvasに(1)ぼかし背景を`.post-blur`と同じcover+`scale(1.1)`相当で全面描画
@@ -372,23 +433,23 @@ canvasに(1)ぼかし背景を`.post-blur`と同じcover+`scale(1.1)`相当で�
 ラクション）はこの変更の影響を受けない。
 
 - 送信（`btn-send`）API成功後: `playSendoff()`
-  （[shor.html:1781-1812](../shor.html#L1781-L1812)）を呼び、
+  （[shor.html:1794-1825](../shor.html#L1794-L1825)）を呼び、
   送り出し演出（下記）を再生してから`openDone()`を呼び、フォームを
   リセットする。API失敗時は演出を再生せず、エラー文言のみ表示する
 
 ### 投稿完了の送り出し演出（`playSendoff()`）
 
-受け取り演出（scr-viewの`.unroll-stage`、[shor.html:274-386](../shor.html#L274-L386)）
+受け取り演出（scr-viewの`.unroll-stage`、[shor.html:284-396](../shor.html#L284-L396)）
 と対になる、投稿完了時の演出。`.sendoff-stage`/`.sendoff-overlay`への
 `play`クラス付与だけで全ての間合いをCSSアニメーションに任せており、
 JS側は再生開始と合計`SENDOFF_TOTAL_MS`（6.8秒）後の後始末しか行わない
 （`openDone()`呼び出し、フォームのリセット）。演出中は
 `.sendoff-overlay.play`が画面全体を覆う`position:fixed`要素として
 `pointer-events:auto`になるため、操作はブロックされる
-（[shor.html:388-504](../shor.html#L388-L504)）。
+（[shor.html:398-514](../shor.html#L398-L514)）。
 
 後始末は2段階に分かれている（`playSendoff()`,
-[shor.html:1781-1812](../shor.html#L1781-L1812)）。`SENDOFF_TOTAL_MS`後、
+[shor.html:1794-1825](../shor.html#L1794-L1825)）。`SENDOFF_TOTAL_MS`後、
 `openDone()`と`overlay`の後始末は即座に行うが、`.sendoff-stage`の
 `play`クラス解除だけは、その内側の1250ms後のsetTimeout
 （`resetPostForm()`と同じタイミング）まで遅らせている。`.play`を外すと
@@ -411,9 +472,9 @@ setTimeoutにまとめていたが、そうすると画面自体の`--dur-fade`�
 1. **ポラロイドが上へ巻かれる**（0〜2.2s）: 巻かれるのはアニメ専用の複製
    ではなく、画面に表示されている`#post-polaroid`（投稿カードそのもの）。
    これを包む`.sendoff-shadow`（drop-shadow） > `.sendoff-clip`（`clip-path`、
-   [shor.html:406-414](../shor.html#L406-L414)）の`clip-path`が
+   [shor.html:416-424](../shor.html#L416-L424)）の`clip-path`が
    `inset(0 0 4.5px 0)`→`inset(0 0 calc(100% - 13px) 0)`へ変化する
-   （`sendoffRollUp`, [shor.html:455-458](../shor.html#L455-L458)）。
+   （`sendoffRollUp`, [shor.html:465-468](../shor.html#L465-L468)）。
    終点を`100%`（完全に消える）ではなく`calc(100% - 13px)`に、始点を
    `0`ではなく`4.5px`にしているのは、**clip境界を筒の中心に一致させる**
    ため。筒（`sendoffTubeUp`）は`top`基準で`top:calc(100% - 9px);height:9px`
@@ -431,7 +492,7 @@ setTimeoutにまとめていたが、そうすると画面自体の`--dur-fade`�
    その残りを覆い隠している。筒自体は2.7〜3.2sの`sendoffTubeFade`で
    フェードアウトするため、何もしなければ筒が消えた瞬間に残り13pxの
    帯だけが宙に浮いて見えてしまう。これを防ぐため、`.sendoff-clip`には
-   `sendoffClipFinish`（[shor.html:461-464](../shor.html#L461-L464)）を
+   `sendoffClipFinish`（[shor.html:471-474](../shor.html#L471-L474)）を
    `sendoffRollUp`と並べて重ね、`sendoffTubeFade`と全く同じ`.5s ease 2.7s`
    で残り13pxを`inset(0 0 100% 0)`（完全に閉じ切る）まで動かしている。
    筒が透明になり切るタイミングと、カードが完全に見えなくなるタイミングが
@@ -441,11 +502,11 @@ setTimeoutにまとめていたが、そうすると画面自体の`--dur-fade`�
    ブラウザによっては角丸矩形の再計算が毎フレーム正しく行われず、筒より
    下にカードが薄く残って見えることがあるため、アニメ対象のclip-pathから
    はroundを外し、角丸をoverflow:hidden側に一本化した）。`#post-polaroid`
-   自身の`box-shadow`（`.polaroid`, [shor.html:237-238](../shor.html#L237-L238)）も
+   自身の`box-shadow`（`.polaroid`, [shor.html:247-248](../shor.html#L247-L248)）も
    この`overflow:hidden`で同じ境界に収まる。
 
    `.sendoff-shadow`には見た目に影響しない`transform:translateZ(0)`
-   （[shor.html:398-405](../shor.html#L398-L405)）も付けてある。受け取り
+   （[shor.html:408-415](../shor.html#L408-L415)）も付けてある。受け取り
    演出側の`.polaroid-shadow`には`rotate(1.5deg)`があり、それが独立した
    合成レイヤーを作る副作用で`filter:drop-shadow`が子の`clip-path`アニメ
    ーションに毎フレーム正しく追従しているが、送り出し側の`.sendoff-shadow`
@@ -454,7 +515,7 @@ setTimeoutにまとめていたが、そうすると画面自体の`--dur-fade`�
    `.sendoff-clip`側にも`will-change:clip-path`を付け、同様に正しいレイヤー
    化を促している。加えて`.sendoff-stage.play
    .polaroid{backdrop-filter:none;-webkit-backdrop-filter:none}`
-   （[shor.html:424-427](../shor.html#L424-L427)）で演出中は
+   （[shor.html:434-437](../shor.html#L434-L437)）で演出中は
    `backdrop-filter`を明示的に無効化している。WebKitは`backdrop-filter`
    を持つ要素の背景ぼかし層を祖先の`clip-path`で正しく切り取れないことが
    あり、カード本体が消えても層だけ筒の下に残って見えることがあるための
@@ -469,7 +530,7 @@ setTimeoutにまとめていたが、そうすると画面自体の`--dur-fade`�
 3. **ボトル画像がフェードイン**（3.2〜4.0s。`rotate(-3deg)`固定、
    `scale .97→1`）: `.sendoff-bottle`内は自作SVGではなく背景透過の実写画像
    `bottle.png`（`<img src="bottle.png" alt="" width="190">`,
-   [shor.html:828-830](../shor.html#L828-L830)）。`.sendoff-bottle`自体の
+   [shor.html:841-843](../shor.html#L841-L843)）。`.sendoff-bottle`自体の
    `opacity`/`transform`アニメーションと`filter:drop-shadow`は変更しておらず、
    drop-shadowは透過画像の輪郭に沿って効く
 4. **ボトルが漂いながら退場**（4.0〜6.4s）: `translate(58px,-50px)`の
@@ -485,7 +546,7 @@ setTimeoutにまとめていたが、そうすると画面自体の`--dur-fade`�
 います」というメッセージを別途フェードインさせ、数秒静止してから遷移
 していたが、この文言専用のステップ（`#sendoff-message`）は廃止した。
 現在は同じ文言を投稿完了画面（scr-done）の`.done-main`先頭の常設テキスト
-として表示している（`<p class="passage">`、[shor.html:839](../shor.html#L839)）。
+として表示している（`<p class="passage">`、[shor.html:852](../shor.html#L852)）。
 これにより演出の総時間も10秒から6.8秒に短縮された。
 
 `prefers-reduced-motion: reduce`環境では、`.sendoff-stage.play`を
@@ -502,8 +563,8 @@ setTimeoutにまとめていたが、そうすると画面自体の`--dur-fade`�
 
 ## scr-done（画面4: 投稿完了）
 
-- 表示関数: `openDone()`（[shor.html:1873](../shor.html#L1873)、投稿直後）
-  / `backToDone()`（[shor.html:1874-1881](../shor.html#L1874-L1881)、閲覧起点がdoneで
+- 表示関数: `openDone()`（[shor.html:1886](../shor.html#L1886)、投稿直後）
+  / `backToDone()`（[shor.html:1887-1894](../shor.html#L1887-L1894)、閲覧起点がdoneで
   かつ候補0件だったときのみ使用。`done-body`のpendingクラスを一旦外して
   再アニメーションできる状態に戻す。現像を最後までやり切った場合は
   `renderHome()`でscr-homeに抜けるため、この関数は呼ばれない）
@@ -521,20 +582,20 @@ setTimeoutにまとめていたが、そうすると画面自体の`--dur-fade`�
     ボタンと重なるため使っていない。`#pwa-help`は`position:absolute`で
     通常のレイアウトの高さ計算に参加しないようにしてあり、押下前後で
     `#pwa-note`やボタンの位置が動かないようにしている
-    （[shor.html:210-221](../shor.html#L210-L221)、JS側は
-    [shor.html:1900-1934](../shor.html#L1900-L1934)）
+    （[shor.html:218-231](../shor.html#L218-L231)、JS側は
+    [shor.html:1913-1947](../shor.html#L1913-L1947)）
 
 ## モーダル（画面遷移ではなく重ね表示）
 
 `.screen`とは別に、現在の画面の上に重ねて出すモーダルが3つある
-（`showModal()`/`hideModal()`, [shor.html:1973-1979](../shor.html#L1973-L1979)）。
+（`showModal()`/`hideModal()`, [shor.html:1986-1992](../shor.html#L1986-L1992)）。
 
 - `result-modal`（投稿結果） — 以前は`withResultGate()`が`pendingResults`
   （前日以前に投稿してまだ結果を見せていない投稿の配列、古い順）を見て
   ボタン操作をブロックし自動的に開いていたが、この仕組みは廃止した。
   現在は**scr-homeの「しらせ帯」（`#home-notice`）をタップしたときだけ**
   開く（上記scr-home節参照）。中身は`showNextResult()`
-  （[shor.html:1214-1228](../shor.html#L1214-L1228)）が`pendingResults`から
+  （[shor.html:1227-1241](../shor.html#L1227-L1241)）が`pendingResults`から
   1件popして描画する:
   - `#result-sec`に秒数（`view_history.viewed_seconds`の合計、
     `getResultForPost()`で投稿単位に集計）
@@ -554,7 +615,7 @@ setTimeoutにまとめていたが、そうすると画面自体の`--dur-fade`�
   先送りされ、実際に1人以上に見られた後、最初にアプリを開いたときに初めて
   結果が表示される。表示される秒数は必ず1秒以上になる。
 
-  モーダルを閉じる（`closeResultModal()`, [shor.html:1981-1986](../shor.html#L1981-L1986)）
+  モーダルを閉じる（`closeResultModal()`, [shor.html:1994-1999](../shor.html#L1994-L1999)）
   たびに`pendingResults`が残っていれば次の1件を表示し、無くなって初めて
   閉じたままになる（以前あった「閉じた後に本来のアクションへ進む」
   `afterResultAction`の仕組みは、画面遷移を一切ブロックしなくなったため
@@ -588,13 +649,13 @@ PWAをホーム画面から開くと、OSがネットワークに問い合わせ
 
 - `document.lastModified`（現在表示中のHTMLが読み込まれた時点の
   `Last-Modified`ヘッダー値）を起動時の基準値として保持する
-  （[shor.html:1946-1948](../shor.html#L1946-L1948)）
+  （[shor.html:1959-1961](../shor.html#L1959-L1961)）
 - フォアグラウンド復帰のたび（`visibilitychange`が`visible`、または
   `pageshow`の`persisted`）、`checkForUpdate()`
-  （[shor.html:1949-1963](../shor.html#L1949-L1963)）が無キャッシュの`HEAD`
+  （[shor.html:1962-1976](../shor.html#L1962-L1976)）が無キャッシュの`HEAD`
   リクエストで自分自身の最新の`Last-Modified`を取得し、基準値より新しければ
   画面上部に固定表示のバナー`#update-banner`
-  （[shor.html:656-663](../shor.html#L656-L663)）を出す
+  （[shor.html:669-676](../shor.html#L669-L676)）を出す
 - タップで`location.reload()`するだけで、**自動リロードはしない**。投稿の
   長文入力中や現像の5秒長押し中に不意にリロードされて作業が消えることを
   避けるため
