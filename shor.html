@@ -121,8 +121,12 @@ body{
 #scr-done{max-height:100%;height:100%}
 
 /* 指示テキスト（案内文）: 11px / 400 — 読みやすさと繊細さの均衡 */
-p.passage{font-size:11px;font-weight:400;letter-spacing:.22em;color:var(--ink-mist);line-height:2}
-p.passage + p.passage{margin-top:2em}
+/* line-height/margin-topは画面高600px〜950pxの範囲でclamp()により可変。
+   950px以上では従来値（line-height:2 / margin-top:2em）のまま、
+   600px以下では詰めた値（1.7 / 1.3em）で頭打ちになる */
+p.passage{font-size:11px;font-weight:400;letter-spacing:.22em;color:var(--ink-mist);
+  line-height:clamp(1.7, calc(1.7 + .3 * ((100dvh - 600px) / 350px)), 2)}
+p.passage + p.passage{margin-top:clamp(1.3em, calc(1.3em + .7em * ((100dvh - 600px) / 350px)), 2em)}
 /* ホーム説明文の1〜2段落目だけを上へ視覚的にずらし、背景写真の水平線が
    段落間の空白（この下の3段落目との間）に来るようにする。position:relativeは
    レイアウト上の占有幅を変えないため、3・4段落目やボタンの位置には影響しない */
@@ -133,7 +137,8 @@ p.passage + p.passage{margin-top:2em}
 /* 投稿画面・閲覧画面のポラロイド外側・上に置く「その日のテーマ」表示。
    ホーム画面には出さない（撤去済み）。既存のポラロイド関連クラス
    （.polaroid等）とは独立させ、新規クラスのみで組む */
-.theme-note{text-align:center;margin-bottom:1.8em}
+.theme-note{text-align:center;
+  margin-bottom:clamp(1em, calc(1em + .8em * ((100dvh - 600px) / 350px)), 1.8em)}
 .theme-note[hidden]{display:none}
 .theme-note .theme-label{font-size:9px;font-weight:300;letter-spacing:.24em;color:var(--ink-faint)}
 .theme-note .theme-text{margin-top:.6em;font-size:13px;font-weight:400;
@@ -162,7 +167,7 @@ p.passage + p.passage{margin-top:2em}
   border:1px solid rgba(236,231,220,.18);border-radius:2px;
   background:rgba(236,231,220,.05);transition:background-color .4s ease;
   animation:noticeStripPulse 2.6s ease-in-out infinite}
-#home-to-post{margin-top:3em}
+#home-to-post{margin-top:clamp(1.6em, calc(1.6em + 1.4em * ((100dvh - 600px) / 350px)), 3em)}
 /* しらせ帯が実際に表示されているとき（#home-a＋しらせ帯＋ボタン対が全部
    並ぶ最も縦に長い状態）だけ、主ボタンの上マージンを詰める。狭い画面
    （iPhone SE等）でフッターと重ならないようにするための調整で、しらせ帯が
@@ -198,12 +203,15 @@ h2.quiet{font-size:10px;letter-spacing:.55em;color:var(--ink-faint);
 .btn.ghost{border-color:transparent;color:var(--ink-faint);font-size:10px;font-weight:300;padding:10px 24px}
 .btn.ghost:hover{color:var(--ink-mist)}
 /* 副ボタン（#btn-see「浜辺を見に行く」）。主ボタンと同じ形状のまま、枠線の
-   不透明度だけ下げて従属して見せる。margin-topを詰めて主ボタンと1組にする */
-.btn.secondary{border-color:rgba(245,241,232,.14);margin-top:1.2em}
+   不透明度だけ下げて従属して見せる。margin-topを詰めて主ボタンと1組にする。
+   画面高600px〜950pxでclamp()により.5em〜1.2emの範囲で可変 */
+.btn.secondary{border-color:rgba(245,241,232,.14);
+  margin-top:clamp(.5em, calc(.5em + .7em * ((100dvh - 600px) / 350px)), 1.2em)}
 #home-to-post, #btn-see{width:190px}
 
 /* 完了画面: 2ボタンを横並びに。狭い画面では字間とpaddingを詰めて収める */
-.done-actions{display:flex;gap:12px;justify-content:center;margin-top:3.2em}
+.done-actions{display:flex;gap:12px;justify-content:center;
+  margin-top:clamp(1.8em, calc(1.8em + 1.4em * ((100dvh - 600px) / 350px)), 3.2em)}
 .done-actions .btn{margin-top:0;flex:1 1 0;min-width:0;
   padding:13px 10px;letter-spacing:.16em;text-indent:.16em;white-space:nowrap}
 
@@ -212,9 +220,11 @@ h2.quiet{font-size:10px;letter-spacing:.55em;color:var(--ink-faint);
    常に重ならないようにする */
 #done-body{flex:1;width:100%;display:flex;flex-direction:column;justify-content:center;padding-bottom:6.5em}
 .done-main{display:flex;flex-direction:column;align-items:center}
-.done-foot{padding-top:3.4em;display:flex;flex-direction:column;align-items:center;position:relative}
+.done-foot{padding-top:clamp(1.8em, calc(1.8em + 1.6em * ((100dvh - 600px) / 350px)), 3.4em);
+  display:flex;flex-direction:column;align-items:center;position:relative}
 .done-foot .small{margin-top:0}
-.btn.done-pwa{font-size:9.5px;padding:9px 22px;letter-spacing:.28em;text-indent:.28em;margin-top:1.6em}
+.btn.done-pwa{font-size:9.5px;padding:9px 22px;letter-spacing:.28em;text-indent:.28em;
+  margin-top:clamp(.8em, calc(.8em + .8em * ((100dvh - 600px) / 350px)), 1.6em)}
 /* ボタン押下後の操作手順はabsolute配置にして、文言の有無が.done-foot自体の高さに
    影響しないようにする（#done-bodyはjustify-content:centerなので、ここの高さが
    変わるとボタン押下前の位置まで一緒にずれてしまうため） */
@@ -238,15 +248,15 @@ footer a{color:inherit;text-decoration:none;border-bottom:1px solid rgba(207,201
     inset 0 1px 0 rgba(255,255,255,.5), inset 0 -1px 0 rgba(45,36,26,.06);
   transition:opacity 1400ms ease, transform 1400ms ease;
 }
-/* 投稿画面だけポラロイドを一回り小さくする。テーマ・戻る導線を含めた
-   全体がiPhone SE相当（375×667）でスクロールなしに収まるようにするため
-   （正方形の写真枠が縮む分、縦幅の削減効果が大きい） */
-#post-polaroid{width:min(78vw,320px)}
-/* 閲覧画面も同様に一回り小さくする（#view-polaroidは.polaroidの
-   width:min(86vw,350px)を直接持つため、親の.unroll-stageの幅を
-   変えるだけでは追従しない）。※写真の保存はご遠慮くださいの注意書きを
-   フッターより上に収めるための調整 */
-#view-polaroid{width:min(76vw,315px)}
+/* 投稿画面・閲覧画面のポラロイドは、画面幅ではなく利用可能な高さを基準に
+   サイズを決める（正方形の写真枠が縦幅の大部分を占めるため）。
+   calc(100dvh - Npx)の項が、テーマ・キャプション行・裾（ボタン/現像ゾーン）・
+   戻る導線・上下のpaddingなど「写真以外に必要な高さ」を100dvhから差し引き、
+   残りをポラロイド全体の目安の高さとして使う。Nの内訳・検証範囲は
+   docs/screens.mdの該当節を参照。画面高が十分あるときはvw/px上限が効き、
+   画面高が厳しいときだけこの項が効いて幅（＝正方形なので高さも）が縮む */
+#post-polaroid{width:min(78vw,320px,calc(100dvh - 330px))}
+#view-polaroid{width:min(76vw,315px,calc(100dvh - 385px))}
 .polaroid::before{ /* 印画紙の繊維感。#shore::afterと同じノイズ画像を極薄で重ねる */
   content:"";position:absolute;inset:0;z-index:-1;
   border-radius:inherit;pointer-events:none;opacity:.04;
@@ -545,11 +555,14 @@ footer a{color:inherit;text-decoration:none;border-bottom:1px solid rgba(207,201
   line-height:1.9;color:var(--ink-charcoal-soft);opacity:0;transition:opacity 900ms ease}
 .under-note.show{opacity:1}
 
-.screen-note{margin-top:auto;padding-top:16px;font-size:9px;font-weight:300;letter-spacing:.22em;
-  color:var(--ink-faint)}
+.screen-note{margin-top:auto;
+  padding-top:clamp(8px, calc(8px + 8px * ((100dvh - 600px) / 350px)), 16px);
+  font-size:9px;font-weight:300;letter-spacing:.22em;color:var(--ink-faint)}
 
 /* 控えめな「TOPへ戻る」リンク（中断用）。フッターと干渉しないよう下端から少し上に置く */
-.to-top{margin-top:auto;padding-top:30px;margin-bottom:6px;
+.to-top{margin-top:auto;
+  padding-top:clamp(14px, calc(14px + 16px * ((100dvh - 600px) / 350px)), 30px);
+  margin-bottom:6px;
   appearance:none;background:transparent;border:none;cursor:pointer;
   font:inherit;font-size:9.5px;font-weight:300;letter-spacing:.24em;text-indent:.24em;color:var(--ink-faint);
   transition:color .5s ease}

@@ -19,21 +19,21 @@
 
 ## クライアント側の実装（localStorage）
 
-- `freeUsedToday()` / `useFreeGrant()` （[shor.html:1131-1132](../shor.html#L1131-L1132)）
+- `freeUsedToday()` / `useFreeGrant()` （[shor.html:1147-1148](../shor.html#L1147-L1148)）
   `localStorage` の `shor:viewFreeUsed` に「無料枠を使った日付（`appDayStr()`、
   後述）」を保存する。値が今日の`appDayStr()`と一致していれば「今日はもう
   無料枠を使った」と判定する。
 - `postGrants()` / `addPostGrant()` / `consumePostGrant()`
-  （[shor.html:1134-1147](../shor.html#L1134-L1147)）
+  （[shor.html:1150-1163](../shor.html#L1150-L1163)）
   `localStorage` の `shor:postGrants` に `{date, count, granted}`
   （`date`は`appDayStr()`）を保存する。`addPostGrant()` は投稿成功時
-  （[shor.html:1762](../shor.html#L1762)、`createPost` 成功直後）に呼ばれる
+  （[shor.html:1775](../shor.html#L1775)、`createPost` 成功直後）に呼ばれる
   が、その日すでに `granted:true` なら何もしない — **同じ日に何通投稿しても、
   投稿ボーナスは+1しか増えない。**
-- `canView()` （[shor.html:1148](../shor.html#L1148)）
+- `canView()` （[shor.html:1164](../shor.html#L1164)）
   `!freeUsedToday() || postGrants() > 0`。無料枠が未消費、または投稿枠の残数が
   あれば閲覧可能。ボタンを押せるかどうかの入り口の判定にのみ使う。
-- `consumeView()` （[shor.html:1149-1152](../shor.html#L1149-L1152)）
+- `consumeView()` （[shor.html:1165-1168](../shor.html#L1165-L1168)）
   無料枠が未消費ならまず無料枠を消費し、消費済みなら投稿枠を1つ消費する。
   **無料枠が優先的に消費される。**
 
@@ -41,8 +41,8 @@
 
 `consumeView()` は「届いた一通を見る」を押した時点（＝画面を開いた時点）
 ではなく、**現像インタラクションが完了した瞬間**に呼ばれる
-（[shor.html:1361-1362](../shor.html#L1361-L1362)、`tick()` 内で
-`developed` が `true` になる箇所）。
+（[shor.html:1374-1376](../shor.html#L1374-L1376)、`tick()` 内で
+`developed` が `true` になった直後に呼ばれる箇所）。
 
 写真を開いただけで長押しをやめて離脱した場合は枠を消費しない。実際に
 5秒間の長押し（現像）をやり切った時点で初めて「1枚見た」とみなす。
@@ -53,12 +53,12 @@
 2つのRPCに分けてある。
 
 1. **`peek_drift(viewer_id)`** （候補を選ぶだけ、副作用なし）
-   写真を開いた瞬間 `getRandomDrift()`（[shor.html:1281](../shor.html#L1281)）
+   写真を開いた瞬間 `getRandomDrift()`（[shor.html:1294](../shor.html#L1294)）
    から呼ばれる。加重ランダムで候補を選んで返すだけで、`view_count` の増分も
    `view_history` への記録も一切行わない。何度呼んでも状態は変わらない。
 2. **`confirm_drift(viewer_id, post_id)`** （現像完了時に呼ぶ、ここで確定）
-   `confirmDrift()`（[shor.html:1011-1016](../shor.html#L1011-L1016)）から、
-   `tick()` 内で `developed` が `true` になった瞬間（[shor.html:1362](../shor.html#L1362)）
+   `confirmDrift()`（[shor.html:1024-1029](../shor.html#L1024-L1029)）から、
+   `tick()` 内で `developed` が `true` になった瞬間（[shor.html:1375](../shor.html#L1375)）
    に呼ばれる。ここで初めて:
    - 1日の視聴上限チェック（後述）
    - 対象投稿がまだ有効か（`peek` から時間が経っている間に上限到達/期限切れ/
@@ -73,7 +73,7 @@
 confirmDrift() の呼び出しは非同期（fire-and-forget）だが、現像完了直後に
 指を離した際に呼ばれる `recordViewHistoryDB()`（`viewed_seconds` の確定更新）
 より先に `view_history` の予約行が挿入されている必要があるため、
-`release()`（[shor.html:1395-1399](../shor.html#L1395-L1399)）は
+`release()`（[shor.html:1408-1412](../shor.html#L1408-L1412)）は
 `confirmDrift()` の完了を待ってから `recordViewHistoryDB()` を呼ぶよう
 順序を保証している。UI側の画面遷移（washed演出など）はこの待ち合わせを
 またずに即座に始まる。
@@ -91,18 +91,18 @@ peek/confirmに分離し、どちらも「現像完了」という同じ瞬間�
 
 ### リセットのタイミング: 深夜0時ではなく朝7時
 
-`appDayStr()` （[shor.html:929-932](../shor.html#L929-L932)）が「アプリ内の
+`appDayStr()` （[shor.html:942-945](../shor.html#L942-L945)）が「アプリ内の
 1日」の文字列を作る。**現在時刻から7時間引いた時点の日付**をその日として
 扱う実装（`APP_DAY_SHIFT_MS = 7 * 60 * 60 * 1000`）で、端末の**ローカル
 時刻**基準。つまり無料枠・投稿枠のリセットは「ローカル時間の朝7時」を境に
 起こり、深夜0時〜6時59分はまだ前日として扱われる。`appYesterdayStr()`
-（[shor.html:933-937](../shor.html#L933-L937)）は同じ区切りでの前日を返す。
+（[shor.html:946-950](../shor.html#L946-L950)）は同じ区切りでの前日を返す。
 
 以前は`todayStr()`（深夜0時区切り）を使っていたが、「1日の区切りが深夜0時
 だと、寝る前・寝起きの生活リズムと合わない」という理由で朝7時区切りに変更した。
 `freeUsedToday`/`postGrants`系の関数（`appDayStr()`を直接使う）だけでなく、
-`renderHome()`の前日結果判定（[shor.html:1173](../shor.html#L1173)）・
-`getResultForDate()`の集計期間（[shor.html:1067-1091](../shor.html#L1067-L1091)、
+`renderHome()`の前日結果判定（[shor.html:1186](../shor.html#L1186)）・
+`getResultForDate()`の集計期間（[shor.html:1083-1107](../shor.html#L1083-L1107)、
 後述）・devbar（`dev-yesterday`/`dev-skip`）まで、**日付境界に関わる箇所は
 全て`appDayStr()`/`appYesterdayStr()`に統一**してある。
 
@@ -120,15 +120,15 @@ peek/confirmに分離し、どちらも「現像完了」という同じ瞬間�
 
 - **ホーム画面**（`#btn-see`「浜辺を見に行く」）: 文言・`disabled`の出し分けは
   廃止し、常時表示・常時押下可能にした。クリックで無条件に`openView("home")`
-  する（[shor.html:2001](../shor.html#L2001)）。`canView()`の判定は
+  する（[shor.html:2014](../shor.html#L2014)）。`canView()`の判定は
   `openView()`側に移り、`false`なら`peek_drift`すら呼ばずscr-view画面内で
-  `showViewEmpty()`（[shor.html:1330-1335](../shor.html#L1330-L1335)）が
+  `showViewEmpty()`（[shor.html:1343-1348](../shor.html#L1343-L1348)）が
   「明日の朝　潮が満ちるころに届きます」と案内する
-  （[shor.html:1276-1279](../shor.html#L1276-L1279)。モーダルではなく
+  （[shor.html:1289-1292](../shor.html#L1289-L1292)。モーダルではなく
   画面遷移後の常設表示で、「ホームへ」ボタンで戻る）。以前あった
   「投稿済みかどうかで文言を変える」分岐はこれより前に廃止済み
 - **投稿完了画面**「流れ着いた一通を見る」（`#btn-give2see`、
-  [shor.html:1883-1889](../shor.html#L1883-L1889)）: こちらは変更なし。
+  [shor.html:1896-1902](../shor.html#L1896-L1902)）: こちらは変更なし。
   クリック時に`canView()`を判定し、`false`なら`notice-modal`で
   「今日のボトルメールは以上です　朝7時に、次の一通が流れ着きます」と表示する
 
