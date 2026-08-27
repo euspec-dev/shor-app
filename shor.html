@@ -238,6 +238,15 @@ footer a{color:inherit;text-decoration:none;border-bottom:1px solid rgba(207,201
     inset 0 1px 0 rgba(255,255,255,.5), inset 0 -1px 0 rgba(45,36,26,.06);
   transition:opacity 1400ms ease, transform 1400ms ease;
 }
+/* 投稿画面だけポラロイドを一回り小さくする。テーマ・戻る導線を含めた
+   全体がiPhone SE相当（375×667）でスクロールなしに収まるようにするため
+   （正方形の写真枠が縮む分、縦幅の削減効果が大きい） */
+#post-polaroid{width:min(78vw,320px)}
+/* 閲覧画面も同様に一回り小さくする（#view-polaroidは.polaroidの
+   width:min(86vw,350px)を直接持つため、親の.unroll-stageの幅を
+   変えるだけでは追従しない）。※写真の保存はご遠慮くださいの注意書きを
+   フッターより上に収めるための調整 */
+#view-polaroid{width:min(76vw,315px)}
 .polaroid::before{ /* 印画紙の繊維感。#shore::afterと同じノイズ画像を極薄で重ねる */
   content:"";position:absolute;inset:0;z-index:-1;
   border-radius:inherit;pointer-events:none;opacity:.04;
@@ -267,7 +276,7 @@ footer a{color:inherit;text-decoration:none;border-bottom:1px solid rgba(207,201
    (#view-polaroid、キャプション・写真・現像ゾーンを含む可変高さの本体)を
    包む形に統合。固定ピクセル値ではなく%/calc()で本体の実高さに追従させる。 */
 /* 前置きメッセージが消え切るまでは巻紙・ひとも含めて完全に不可視にする */
-.unroll-stage{position:relative;width:min(86vw,350px);opacity:0;transition:opacity 300ms ease}
+.unroll-stage{position:relative;width:min(76vw,315px);opacity:0;transition:opacity 300ms ease}
 .unroll-stage.play{opacity:1}
 .polaroid-shadow{
   transform:rotate(1.5deg); /* clip-path側と一緒に回すことで開く途中のゆがみを防ぐ。
@@ -495,8 +504,6 @@ footer a{color:inherit;text-decoration:none;border-bottom:1px solid rgba(207,201
 }
 
 /* 投稿完了画面: 遷移が落ち着いてから本文をフェードイン */
-.post-lead{transition:opacity 900ms ease}
-.post-lead.gone{opacity:0}
 .done-body{transition:opacity 1100ms ease}
 .done-body.pending{opacity:0;pointer-events:none}
 .polaroid .caption{
@@ -538,7 +545,7 @@ footer a{color:inherit;text-decoration:none;border-bottom:1px solid rgba(207,201
   line-height:1.9;color:var(--ink-charcoal-soft);opacity:0;transition:opacity 900ms ease}
 .under-note.show{opacity:1}
 
-.screen-note{margin-top:auto;padding-top:26px;font-size:9px;font-weight:300;letter-spacing:.22em;
+.screen-note{margin-top:auto;padding-top:16px;font-size:9px;font-weight:300;letter-spacing:.22em;
   color:var(--ink-faint)}
 
 /* 控えめな「TOPへ戻る」リンク（中断用）。フッターと干渉しないよう下端から少し上に置く */
@@ -557,10 +564,7 @@ footer a{color:inherit;text-decoration:none;border-bottom:1px solid rgba(207,201
 .polaroid .caption-input::placeholder{color:rgba(61,58,53,.38);letter-spacing:.16em}
 .cap-row{position:relative;padding-bottom:12px}
 .counter{position:absolute;right:0;bottom:14px;font-size:9px;font-weight:400;letter-spacing:.12em;
-  color:rgba(61,58,53,.45);opacity:0;transition:color .4s ease,opacity .4s ease}
-.counter.show{opacity:1}
-.counter.over{color:var(--rust)}
-.caption-input.over{color:var(--rust)}
+  color:rgba(61,58,53,.45)}
 
 /* 投稿写真の拡大縮小・移動調整。#post-photoがジェスチャーの当たり判定
    コンテナ（touch-action:noneでブラウザ標準のスクロール/ズームを無効化し、
@@ -783,7 +787,6 @@ footer a{color:inherit;text-decoration:none;border-bottom:1px solid rgba(207,201
 
   <!-- ============ 画面3: 投稿（海に流す） ============ -->
   <section class="screen" id="scr-post" aria-label="海に流す">
-    <p class="passage post-lead" id="post-lead" style="margin-top:2.6em;margin-bottom:3em">今度はこっそりと、<br>あなたの感性を誰かに届けてみませんか？</p>
     <div class="theme-note" id="post-theme">
       <p class="theme-label">今日のテーマ</p>
       <p class="theme-text" id="post-theme-text"></p>
@@ -1628,7 +1631,6 @@ function showPickError(text, ms = 3600){
 }
 
 function openPost(){
-  $("post-lead").hidden = false;
   $("post-polaroid").hidden = false;
   $("post-theme-text").textContent = `「${themeFor()}」`;
   /* 戻る導線: 閲覧可能なら閲覧画面へ誘導、不可なら通常のホームへ戻る
@@ -1655,15 +1657,29 @@ function postValid(){
   const len = [...capInput.value].length;
   return pickedDataUrl !== null && len <= 15;
 }
+/* maxlength="15"属性はIME変換中（未確定文字列）には効かないため、変換確定後に
+   15文字を超えていたら切り詰める。変換中に呼ぶとカーソル位置や変換候補が
+   壊れるため、compositionend後・通常入力時のみ行う */
+function enforceCapLimit(){
+  const chars = [...capInput.value];
+  if (chars.length > 15) capInput.value = chars.slice(0, 15).join("");
+}
 function refreshPostUI(){
   const len = [...capInput.value].length;
   capCounter.textContent = `${len}/15`;
-  capCounter.classList.toggle("show", len >= 11); /* 残り5文字（11文字目）を切ってから表示 */
-  capCounter.classList.toggle("over", len > 15);
-  capInput.classList.toggle("over", len > 15);
   btnSend.disabled = !postValid();
 }
-capInput.addEventListener("input", refreshPostUI);
+let capComposing = false;
+capInput.addEventListener("compositionstart", () => { capComposing = true; });
+capInput.addEventListener("compositionend", () => {
+  capComposing = false;
+  enforceCapLimit();
+  refreshPostUI();
+});
+capInput.addEventListener("input", () => {
+  if (!capComposing) enforceCapLimit();
+  refreshPostUI();
+});
 capInput.addEventListener("keydown", e => {
   if (e.key === "Enter"){ e.preventDefault(); capInput.blur(); }
 });
@@ -1745,7 +1761,6 @@ btnSend.addEventListener("click", async () => {
     store.set("myPosts", myPosts);
     addPostGrant();
 
-    $("post-lead").classList.add("gone");
     playSendoff();
   } catch(err) {
     btnSend.disabled = false;
@@ -1791,13 +1806,7 @@ function playSendoff(){
        （resetPostForm()と同じタイミング）まで巻き取り状態を維持する */
     setTimeout(() => {
       stage.classList.remove("play");
-      const lead = $("post-lead");
-      const prevLead = lead.style.transition;
-      lead.style.transition = "none";
       resetPostForm();
-      lead.classList.remove("gone");
-      void lead.offsetWidth;
-      lead.style.transition = prevLead;
     }, 1250);
   }, SENDOFF_TOTAL_MS);
 }
