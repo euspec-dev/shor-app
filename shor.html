@@ -209,7 +209,13 @@ h2.quiet{font-size:10px;letter-spacing:.55em;color:var(--ink-faint);
   margin-top:clamp(.5em, calc(.5em + .7em * ((100dvh - 600px) / 350px)), 1.2em)}
 #home-to-post, #btn-see{width:190px}
 
-/* 完了画面: 2ボタンを横並びに。狭い画面では字間とpaddingを詰めて収める */
+/* 完了画面: 2ボタンを横並びに。狭い画面では字間とpaddingを詰めて収める。
+   .done-mainがalign-items:centerのため.done-actions自体は画面幅いっぱいに
+   広がらず内容に合わせて縮む。white-space:nowrapのボタンが2つ横に並んだ
+   自然幅の合計が画面幅を超えると.done-actionsごと圧縮され、min-width:0の
+   ボタンはnowrapのまま箱より縮むため文字がはみ出す。文言を長くする際は
+   両ボタンの合計幅が画面幅（.screen実効幅は最大でも約380px）に収まるか
+   必ず確認すること */
 .done-actions{display:flex;gap:12px;justify-content:center;
   margin-top:clamp(1.8em, calc(1.8em + 1.4em * ((100dvh - 600px) / 350px)), 3.2em)}
 .done-actions .btn{margin-top:0;flex:1 1 0;min-width:0;
@@ -845,7 +851,7 @@ footer a{color:inherit;text-decoration:none;border-bottom:1px solid rgba(207,201
       <div class="done-main">
         <p class="passage">あなたの一枚が、誰かの岸へ向かっています<br>早ければ明日の朝、しらせが届きます</p>
         <div class="done-actions">
-          <button class="btn" id="btn-give2see">流れ着いた一通を見る</button>
+          <button class="btn" id="btn-give2see">浜辺を見に行く</button>
           <button class="btn" id="btn-post-again">もう一枚流す</button>
         </div>
         <button class="to-top" id="done-to-top" type="button" style="margin-top:1.8em;padding-top:0">ホームへ</button>
