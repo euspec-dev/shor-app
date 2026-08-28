@@ -258,7 +258,7 @@ footer a{color:inherit;text-decoration:none;border-bottom:1px solid rgba(207,201
    親（.sendoff-stage/.unroll-stage）は従来幅（86vw,350px）のままなので、
    ポラロイドだけが縮むと左詰めに見えてしまう。margin:0 autoで
    親の中央に置き直す */
-#post-polaroid{width:min(78vw,320px,calc(100dvh - 330px));margin:0 auto}
+#post-polaroid{width:min(78vw,320px,calc(100dvh - 372px));margin:0 auto}
 #view-polaroid{width:min(76vw,315px,calc(100dvh - 385px));margin:0 auto}
 .polaroid::before{ /* 印画紙の繊維感。#shore::afterと同じノイズ画像を極薄で重ねる */
   content:"";position:absolute;inset:0;z-index:-1;
@@ -570,6 +570,9 @@ footer a{color:inherit;text-decoration:none;border-bottom:1px solid rgba(207,201
   font:inherit;font-size:9.5px;font-weight:300;letter-spacing:.24em;text-indent:.24em;color:var(--ink-faint);
   transition:color .5s ease}
 .to-top:hover{color:var(--ink-mist)}
+/* 投稿画面だけ「浜辺を見に行く」（閲覧枠が残っているときだけ）と「ホームへ」
+   （常時）の2つが並ぶことがある。両方表示されているときだけ間隔を詰める */
+#post-view-link:not([hidden]) + #post-to-top{margin-top:0;padding-top:2px}
 
 /* ============ 投稿画面 ============ */
 .polaroid .caption-input{
@@ -832,6 +835,7 @@ footer a{color:inherit;text-decoration:none;border-bottom:1px solid rgba(207,201
         <img src="bottle.png" alt="" width="190">
       </div>
     </div>
+    <button class="to-top" id="post-view-link" type="button" hidden>浜辺を見に行く</button>
     <button class="to-top" id="post-to-top" type="button">ホームへ</button>
   </section>
 
@@ -1631,9 +1635,9 @@ function showPickError(text, ms = 3600){
 function openPost(){
   $("post-polaroid").hidden = false;
   $("post-theme-text").textContent = `「${themeFor()}」`;
-  /* 戻る導線: 閲覧可能なら閲覧画面へ誘導、不可なら通常のホームへ戻る
-   （動作はpost-to-topのclickハンドラ側、canView()で分岐） */
-  $("post-to-top").textContent = canView() ? "流れ着いた一通を見る" : "ホームへ";
+  /* 戻る導線: 「ホームへ」は常時表示。「浜辺を見に行く」は閲覧枠が
+     残っているときだけ、その上に追加で表示する */
+  $("post-view-link").hidden = !canView();
   show("scr-post");
   /* 送り出し演出のボトル画像(bottle.png)は演出開始から約3秒後に登場するが、
      投稿完了までノーロードのままだと初回表示時に欠けたり遅れたりするため、
@@ -1876,11 +1880,8 @@ $("btn-give2see").addEventListener("click", () => {
   openView("done");
 });
 $("btn-post-again").addEventListener("click", () => openPost());
-/* canView()がtrueなら閲覧画面へ、falseならホームへ（openPost()側で文言も
-   合わせて切り替えている） */
-$("post-to-top").addEventListener("click", () => {
-  if (canView()) openView("post"); else renderHome();
-});
+$("post-to-top").addEventListener("click", () => renderHome());
+$("post-view-link").addEventListener("click", () => openView("post"));
 $("done-to-top").addEventListener("click", () => renderHome());
 $("home-to-post").addEventListener("click", () => openPost());
 $("home-notice").addEventListener("click", () => showNextResult());

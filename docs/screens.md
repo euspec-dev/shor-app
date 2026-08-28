@@ -10,11 +10,11 @@
 scr-home ──「浜辺を見に行く」（常時、写真が無ければ画面内で案内）──▶ scr-view ──現像完了(origin=home)──▶ scr-post
    │                                                                     │
    └──「写真を流す」（常時固定）────────────────────────────────────────────┘
-                                                                       canView()時「流れ着いた一通を見る」
+                                                                       canView()時のみ「浜辺を見に行く」
                                                                        （origin=post）からも到達できる
 scr-post ──送信──▶ scr-done ──「流れ着いた一通を見る」──▶ scr-view ──現像完了(origin=done)──▶ scr-home（戻らない）
 scr-view（写真が無い状態）──「ホームへ」──▶ scr-home
-scr-post/scr-done「ホームへ」・canView()falseの`post-to-top` ──▶ scr-home
+scr-post「ホームへ」（`post-to-top`、常時）・scr-done「ホームへ」（`done-to-top`）──▶ scr-home
 ```
 
 `origin`（`"home"`/`"post"`/`"done"`）は`openView()`の引数で、現像完了後に
@@ -81,7 +81,7 @@ no-scroll設計）のため、はみ出しは「隠れて見えなくなる」�
 
 - 表示関数: `renderHome()`（[shor.html:1160-1210](../shor.html#L1160-L1210)）
 - 呼ばれるタイミング: 起動時、および各画面の「ホームへ」
-  （`post-to-top`が`canView()`falseのとき, `done-to-top`）
+  （`post-to-top`（常時）, `done-to-top`）
 - `pendingResults`（前日以前の投稿で未確認の結果、配列）は毎回計算するが、
   自動でモーダルを出す・画面遷移をブロックすることはしない
   （`withResultGate()`は廃止済み）。結果は下記「しらせ帯」からのみ開く
@@ -324,12 +324,19 @@ DOM上の並び順は `#home-a`（説明文、常時） → `#home-notice`（し
   （引数省略＝今日、[data-model.md](data-model.md)の「投稿テーマ」参照）
   の結果を「今日のテーマ／「（テーマ文言）」」の形で設定する。常に今日の
   投稿の分なので、受け取り側と違って非表示になることはない
-- 戻る導線（`post-to-top`）は`openPost()`が毎回`canView()`を見て文言を
-  切り替える。`true`なら「流れ着いた一通を見る」で押すと`openView("post")`
-  （→scr-view）、`false`なら「ホームへ」で押すと`renderHome()`
-  （[shor.html:1879-1883](../shor.html#L1879-L1883)）。DOM上は
-  `#sendoff-overlay`の直後（画面の一番下）にあり、`#post-polaroid`の
-  すぐ下・フッターの上に位置する
+- 戻る導線は2つのボタンに分かれている（DOM上は`#sendoff-overlay`の直後、
+  画面の一番下、`#post-polaroid`のすぐ下・フッターの上）:
+  - `#post-to-top`「ホームへ」: 常時表示。押すと無条件に`renderHome()`
+    （[shor.html:1883](../shor.html#L1883)）
+  - `#post-view-link`「浜辺を見に行く」: `openPost()`が毎回`canView()`を
+    見て表示/非表示を切り替える（[shor.html:1640](../shor.html#L1640)）。
+    `canView()`が`true`のときだけ`#post-to-top`の**上に追加で**表示され、
+    押すと`openView("post")`（→scr-view）
+    （[shor.html:1884](../shor.html#L1884)）。以前は1つのボタンが
+    `canView()`で文言ごと入れ替わる仕様だったが、「ホームへ」は常に
+    誰にでも見えるべきという理由で分離した。両方表示されているときは
+    `#post-view-link:not([hidden]) + #post-to-top`（[shor.html:575]
+    (../shor.html#L575)）で間隔を詰め、1組のペアに見せている
 - キャプション欄（`#cap-input`）は`maxlength="15"`だが、IME変換中の
   未確定文字列にはこの属性が効かないため、変換確定後（`compositionend`）と
   通常入力時（`input`、非変換中のみ）に`enforceCapLimit()`
@@ -346,13 +353,15 @@ DOM上の並び順は `#home-a`（説明文、常時） → `#home-notice`（し
 ### 投稿写真の拡大縮小・移動調整
 
 `#post-polaroid`は`.polaroid`共通の`width:min(86vw,350px)`を
-`width:min(78vw,320px,calc(100dvh - 330px));margin:0 auto`で上書きして
-いる（[shor.html:261](../shor.html#L261)）。第3項`calc(100dvh - 330px)`は
+`width:min(78vw,320px,calc(100dvh - 372px));margin:0 auto`で上書きして
+いる（[shor.html:261](../shor.html#L261)）。第3項`calc(100dvh - 372px)`は
 `#view-polaroid`と同じ考え方（利用可能な画面高から写真以外に必要な高さを
 差し引いた残り）で、画面高が厳しいときだけ効いて正方形の写真枠
 （`aspect-ratio:1/1`）ごと縮む。テーマ表示・ポラロイド・送信ボタン・戻る
-導線（`post-to-top`）までが画面高600px〜950pxの範囲でスクロールなしに
-収まるようにするための調整（詳細は「レイアウトのレスポンシブ対応」節参照）。
+導線（`canView()`が`true`のときは`#post-view-link`と`#post-to-top`の
+2つが並ぶ、最も縦に長くなる状態）までが画面高600px〜950pxの範囲で
+スクロールなしに収まるようにするための調整（372という定数はこの2つ並び
+状態を基準に調整した。詳細は「レイアウトのレスポンシブ対応」節参照）。
 `margin:0 auto`は、親の`.sendoff-shadow`/`.sendoff-clip`が`.sendoff-stage`
 （従来幅の86vw/350pxのまま）の全幅を占めるのに対し`#post-polaroid`自身は
 より狭い幅を持つため、それだけでは左詰めに見えてしまうのを中央寄せで
@@ -552,9 +561,9 @@ setTimeoutにまとめていたが、そうすると画面自体の`--dur-fade`�
 非表示になる。**スコープは`.play`中に限定**しており、投稿前の
 写真選択中の表示（`.sendoff-stage`は常設）まで消えないよう注意している。
 
-- `post-to-top`は`canView()`で分岐する（詳細は上記「投稿画面の戻る導線」）:
-  `true`なら「流れ着いた一通を見る」→`openView("post")`（→scr-view）、
-  `false`なら「ホームへ」→`renderHome()`（→scr-home）
+- 戻る導線は「ホームへ」（`post-to-top`、常時）と、`canView()`が`true`の
+  ときだけ追加で表示される「浜辺を見に行く」（`post-view-link`、
+  →`openView("post")`→scr-view）の2つ（詳細は上記「投稿画面の戻る導線」）
 
 ## scr-done（画面4: 投稿完了）
 
