@@ -254,9 +254,12 @@ footer a{color:inherit;text-decoration:none;border-bottom:1px solid rgba(207,201
    戻る導線・上下のpaddingなど「写真以外に必要な高さ」を100dvhから差し引き、
    残りをポラロイド全体の目安の高さとして使う。Nの内訳・検証範囲は
    docs/screens.mdの該当節を参照。画面高が十分あるときはvw/px上限が効き、
-   画面高が厳しいときだけこの項が効いて幅（＝正方形なので高さも）が縮む */
-#post-polaroid{width:min(78vw,320px,calc(100dvh - 330px))}
-#view-polaroid{width:min(76vw,315px,calc(100dvh - 385px))}
+   画面高が厳しいときだけこの項が効いて幅（＝正方形なので高さも）が縮む。
+   親（.sendoff-stage/.unroll-stage）は従来幅（86vw,350px）のままなので、
+   ポラロイドだけが縮むと左詰めに見えてしまう。margin:0 autoで
+   親の中央に置き直す */
+#post-polaroid{width:min(78vw,320px,calc(100dvh - 330px));margin:0 auto}
+#view-polaroid{width:min(76vw,315px,calc(100dvh - 385px));margin:0 auto}
 .polaroid::before{ /* 印画紙の繊維感。#shore::afterと同じノイズ画像を極薄で重ねる */
   content:"";position:absolute;inset:0;z-index:-1;
   border-radius:inherit;pointer-events:none;opacity:.04;
@@ -600,15 +603,6 @@ footer a{color:inherit;text-decoration:none;border-bottom:1px solid rgba(207,201
      ジェスチャーは#post-photo側でまとめて処理するため、imgでは拾わない */
 }
 .polaroid .photo .post-adjust.loaded{opacity:1}
-/* 初回（myPosts空）だけ薄く表示する見本写真＋見本キャプション。btn-pickの
-   下に敷くだけの飾りで、pointer-eventsを切って操作を一切奪わない。
-   実際の写真を選ぶとopenPost()とは別にhandlePickedFile()側で非表示にする */
-.post-dummy{position:absolute;inset:0;opacity:.4;pointer-events:none;
-  display:flex;align-items:flex-end;justify-content:center}
-.post-dummy img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
-.post-dummy p{position:relative;margin:0;padding:14px;text-align:center;
-  color:#fff;font-size:10.5px;font-weight:300;letter-spacing:.18em;
-  text-shadow:0 1px 4px rgba(0,0,0,.6)}
 .pick{position:absolute;inset:0;display:grid;place-items:center;cursor:pointer;
   color:rgba(245,241,232,.6);font-size:11px;font-weight:400;letter-spacing:.32em;text-indent:.32em;
   transition:opacity 500ms ease;background:transparent;border:none;
@@ -817,10 +811,6 @@ footer a{color:inherit;text-decoration:none;border-bottom:1px solid rgba(207,201
             <div class="photo" id="post-photo">
               <div class="post-blur" id="post-blur"></div>
               <img class="post-adjust" id="post-adjust" alt="" hidden>
-              <div class="post-dummy" id="post-dummy" hidden>
-                <img id="post-dummy-img" src="" alt="">
-                <p id="post-dummy-caption"></p>
-              </div>
               <button class="pick" id="btn-pick" type="button">＋ 写真を選ぶ</button>
               <div class="photo-note" id="photo-note"></div>
               <input type="file" id="file-input" accept="image/*" hidden>
@@ -969,11 +959,6 @@ function themeFor(dayStr = appDayStr()){
   const days = Math.floor(new Date(dayStr + "T00:00:00Z").getTime() / 86400000);
   return THEMES[((days % THEMES.length) + THEMES.length) % THEMES.length];
 }
-
-/* 初回投稿前（myPosts空）だけ投稿画面に薄く重ねる見本写真・見本キャプション。
-   仮の値。本番実装時に差し替え用の画像・文言を確認すること。 */
-const DUMMY_PHOTO_URL = "bottle.png";
-const DUMMY_CAPTION = "見本の一枚です";
 
 /* ---------- ユーザーID (localStorage で永続化) ---------- */
 /* crypto.randomUUID はセキュアコンテキスト（https: /localhost）専用。
@@ -1649,15 +1634,6 @@ function openPost(){
   /* 戻る導線: 閲覧可能なら閲覧画面へ誘導、不可なら通常のホームへ戻る
    （動作はpost-to-topのclickハンドラ側、canView()で分岐） */
   $("post-to-top").textContent = canView() ? "流れ着いた一通を見る" : "ホームへ";
-  /* myPosts空（一度も投稿していない）ときだけ、見本写真・見本キャプションを
-     薄く重ねる。写真を選んだ瞬間にhandlePickedFile()側で消す */
-  if (store.get("myPosts", []).length === 0){
-    $("post-dummy-img").src = DUMMY_PHOTO_URL;
-    $("post-dummy-caption").textContent = DUMMY_CAPTION;
-    $("post-dummy").hidden = false;
-  } else {
-    $("post-dummy").hidden = true;
-  }
   show("scr-post");
   /* 送り出し演出のボトル画像(bottle.png)は演出開始から約3秒後に登場するが、
      投稿完了までノーロードのままだと初回表示時に欠けたり遅れたりするため、
@@ -1739,7 +1715,6 @@ async function handlePickedFile(file, fromCamera){
       return;
     }
   }
-  $("post-dummy").hidden = true; /* 見本写真は実際の選択が済んだ時点で消す */
   pickedDataUrl = await downscale(file, 1280);
   startAdjust(pickedDataUrl);
   btnPick.classList.add("picked");
@@ -1995,6 +1970,8 @@ function closeResultModal(){
   hideModal("result-modal");
   if (pendingResults.length){
     setTimeout(showNextResult, 700);
+  } else {
+    $("home-notice").hidden = true; /* 全件確認済みになったので、しらせ帯を消す */
   }
 }
 function openNotice(html){ $("notice-text").innerHTML = html; showModal("notice-modal"); }
